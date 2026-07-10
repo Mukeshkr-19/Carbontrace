@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "instance" {
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = ["GreenOps/App"]
+      values   = ["GreenOps/App", "GreenOps/Host"]
     }
   }
 
@@ -51,6 +51,7 @@ data "aws_iam_policy_document" "instance" {
     effect = "Allow"
     actions = [
       "logs:CreateLogStream",
+      "logs:DescribeLogStreams",
       "logs:PutLogEvents",
     ]
     resources = ["${aws_cloudwatch_log_group.application.arn}:*"]

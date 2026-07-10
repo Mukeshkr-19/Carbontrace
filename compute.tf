@@ -34,6 +34,14 @@ resource "aws_instance" "profiler" {
   key_name                    = var.key_name
   associate_public_ip_address = true
   monitoring                  = false
+  user_data = templatefile("${path.module}/scripts/user_data.sh.tftpl", {
+    app_repository_url = var.app_repository_url
+    app_revision       = var.app_revision
+    log_group_name     = aws_cloudwatch_log_group.application.name
+    project_name       = var.project_name
+    run_interval_hours = var.run_interval_hours
+  })
+  user_data_replace_on_change = true
 
   metadata_options {
     http_endpoint               = "enabled"
