@@ -57,24 +57,26 @@ Treat measurements as useful for comparing controlled workload versions, not as 
 - Terraform 1.6 or later
 - AWS CLI credentials for the target AWS account and `us-east-1`
 - an existing EC2 key pair in that Region
-- a pre-created S3 state bucket and DynamoDB lock table
+- a pre-created S3 state bucket
 - a public GitHub repository, because the EC2 bootstrap clones a pinned HTTPS revision
 
 ### Bootstrap the state backend
 
-The `bootstrap/` directory is a deliberately separate Terraform root module. Run it once before initializing the main stack; it creates a versioned, encrypted, publicly blocked S3 bucket and a DynamoDB lock table with point-in-time recovery.
+The `bootstrap/` directory is a deliberately separate Terraform root module. Run it once before initializing the main stack; it creates a versioned, encrypted, publicly blocked S3 bucket with native S3 lockfile support for Terraform state.
 
 ```bash
 cd bootstrap
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars and choose a globally unique state_bucket_name.
 terraform init
-terraform plan -out=tfplan
-terraform apply tfplan
+terraform plan -out=bootstrap.tfplan
+terraform apply bootstrap.tfplan
 cd ..
 ```
 
-Use the two bootstrap outputs to fill your private `backend.hcl` file. Do not run `terraform destroy` in `bootstrap/` until the main stack has been destroyed and its state is no longer needed.
+Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap state remains local in `bootstrap/terraform.tfstate`; keep it private, do not commit it, and do not delete it. The S3 bucket has `prevent_destroy = true`, so normal infrastructure teardown intentionally retains the backend rather than treating it as a leaked resource.
+
+`bootstrap/deployment-user-policy.json` documents the temporary, bucket-scoped permissions used to create and verify the backend. Terraform does not attach this policy. After backend verification, replace the temporary bucket-configuration write permissions with an ongoing backend-only policy before provisioning the main stack.
 
 ## Deploy
 
@@ -90,7 +92,7 @@ Use the two bootstrap outputs to fill your private `backend.hcl` file. Do not ru
    git rev-parse HEAD
    ```
 
-3. Create a private `backend.hcl` from `backend.hcl.example`, using the S3 bucket and DynamoDB table names created by `bootstrap/`.
+3. Create a private `backend.hcl` from `backend.hcl.example`, using the S3 bucket created by `bootstrap/`. Keep `use_lockfile = true`.
 
 4. Initialize, review, and apply. Never bypass the plan review.
 
@@ -98,8 +100,8 @@ Use the two bootstrap outputs to fill your private `backend.hcl` file. Do not ru
    terraform init -backend-config=backend.hcl
    terraform fmt -check -recursive
    terraform validate
-   terraform plan -out=tfplan
-   terraform apply tfplan
+   terraform plan -out=main.tfplan
+   terraform apply main.tfplan
    ```
 
 5. Confirm the timer and reporter after the instance boots:
@@ -143,6 +145,8 @@ When finished, remove the complete stack:
 ```bash
 terraform destroy
 ```
+
+This destroys the main Carbontrace infrastructure only. It does not destroy the separately bootstrapped state bucket, which is protected by `prevent_destroy = true` and must be retained while any Terraform state depends on it.
 
 Then verify that the instance is gone:
 

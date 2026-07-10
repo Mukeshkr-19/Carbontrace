@@ -1,8 +1,9 @@
-# Copy this file outside version control, fill in your pre-created backend values,
-# then run: terraform init -backend-config=backend.hcl
-#
-# bucket         = "your-terraform-state-bucket"
-# key            = "carbontrace/terraform.tfstate"
-# region         = "us-east-1"
-# dynamodb_table = "your-terraform-lock-table"
-# encrypt        = true
+# Copy this file to backend.hcl. It is intentionally not version controlled.
+# Initialize the root module with:
+# AWS_PROFILE=carbontrace terraform init -backend-config=backend.hcl
+bucket       = "carbontrace-tf-562325340670"
+key          = "carbontrace/terraform.tfstate"
+region       = "us-east-1"
+profile      = "carbontrace"
+encrypt      = true
+use_lockfile = true

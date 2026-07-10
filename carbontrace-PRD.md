@@ -92,13 +92,13 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 | Dashboard | `aws_cloudwatch_dashboard` (Terraform resource, not console-built) |
 | Teardown | `terraform destroy` (manual) + optional EventBridge/Lambda auto-stop |
 | CI (optional/stretch) | GitHub Actions: `terraform fmt -check`, `terraform validate`, `terraform plan` on PR |
-| State backend | S3 + DynamoDB (reuse existing backend infra from ATLAS if available) |
+| State backend | S3 with native lockfile (`use_lockfile = true`) |
 
 ## 7. Detailed Requirements by Phase
 
 ### Phase 1 — Infrastructure as Code
 
-- [ ] Bootstrap or document the Terraform backend separately: S3 bucket and DynamoDB lock table must exist before `terraform init`; the project must not silently depend on another repo's state infrastructure
+- [ ] Bootstrap or document the Terraform backend separately: the S3 bucket must exist before `terraform init`, with `use_lockfile = true`; the project must not silently depend on another repo's state infrastructure
 - [ ] Default VPC data lookup (no custom VPC — see PRD decision log)
 - [ ] Security group: inbound SSH 22 from `var.my_ip` only; outbound all
 - [ ] IAM role + instance profile, policy scoped to required actions only:
@@ -194,7 +194,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 
 - `terraform apply` from a clean clone reproduces the entire stack with zero manual steps.
 - Dashboard shows real CPU/memory/CO2 data from at least 3 separate runs.
-- `terraform destroy` cleanly removes everything, verified via `aws ec2 describe-instances`.
+- `terraform destroy` cleanly removes the main application infrastructure, verified via `aws ec2 describe-instances`; the separately bootstrapped state bucket is intentionally retained and protected by `prevent_destroy`.
 - README is readable by someone with zero context and clearly explains the estimation methodology.
 - No AWS costs incurred beyond Free Tier during development.
 - Sanjay can explain the data flow, IAM permissions, estimation limitations, and one debugging decision without relying on the README.

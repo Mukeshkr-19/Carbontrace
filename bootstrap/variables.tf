@@ -13,9 +13,3 @@ variable "state_bucket_name" {
     error_message = "state_bucket_name must be a valid, globally unique S3 bucket name."
   }
 }
-
-variable "lock_table_name" {
-  description = "DynamoDB table name used for Terraform state locking."
-  type        = string
-  default     = "carbontrace-terraform-lock"
-}
