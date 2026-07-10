@@ -5,3 +5,7 @@ key_name = "your-existing-ec2-key-pair"
 
 # Use the full commit SHA of a reviewed repository revision, not a branch name.
 app_revision = "replace-with-a-40-character-commit-sha"
+
+# The auto-stop rule is a periodic cost circuit breaker; terraform destroy is still required for full cleanup.
+auto_stop_enabled        = true
+auto_stop_interval_hours = 1
