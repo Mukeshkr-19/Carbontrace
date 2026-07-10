@@ -1,6 +1,6 @@
-# AWS GreenOps Profiler
+# Carbontrace — AWS GreenOps Profiler
 
-AWS GreenOps Profiler is a small, infrastructure-as-code pipeline that runs a deliberately inefficient Python workload on EC2, measures its CPU and memory behavior, models its energy and CO2e impact, and publishes the results to a Terraform-managed CloudWatch dashboard.
+Carbontrace is a small, infrastructure-as-code pipeline that runs a deliberately inefficient Python workload on EC2, measures its CPU and memory behavior, models its energy and CO2e impact, and publishes the results to a Terraform-managed CloudWatch dashboard.
 
 It is a research-adjacent instrumentation proof of concept, not a hardware power meter or a general-purpose carbon-accounting product. Its purpose is to make workload efficiency observable and provide a foundation for comparing a future LLM inference workload against a controlled baseline.
 
@@ -148,7 +148,7 @@ Then verify that the instance is gone:
 
 ```bash
 aws ec2 describe-instances \
-  --filters "Name=tag:Project,Values=greenops-profiler" \
+  --filters "Name=tag:Project,Values=carbontrace" \
   --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name}' \
   --output table
 ```

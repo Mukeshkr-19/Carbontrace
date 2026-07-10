@@ -1,4 +1,4 @@
-# PRD: AWS GreenOps Profiler
+# PRD: Carbontrace
 
 **Author:** Sanjay
 **Status:** Active build

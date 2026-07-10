@@ -18,7 +18,7 @@ class MetricsReporterTests(unittest.TestCase):
             estimated_co2_grams=0.5,
         )
 
-        publish_metrics(summary, "greenops-profiler", "t3.micro", "us-east-1")
+        publish_metrics(summary, "carbontrace", "t3.micro", "us-east-1")
 
         client = mock_client.return_value
         client.put_metric_data.assert_called_once()
