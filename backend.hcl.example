@@ -2,7 +2,7 @@
 # then run: terraform init -backend-config=backend.hcl
 #
 # bucket         = "your-terraform-state-bucket"
-# key            = "greenops-profiler/terraform.tfstate"
+# key            = "carbontrace/terraform.tfstate"
 # region         = "us-east-1"
 # dynamodb_table = "your-terraform-lock-table"
 # encrypt        = true
