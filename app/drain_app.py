@@ -1,4 +1,4 @@
-"""Bounded, intentionally inefficient workload used for GreenOps measurements."""
+"""Bounded, intentionally inefficient workload used for Carbontrace measurements."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def run_workload(duration_seconds: int, work_size: int) -> WorkloadSummary:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the bounded GreenOps teaching workload.")
+    parser = argparse.ArgumentParser(description="Run the bounded Carbontrace teaching workload.")
     parser.add_argument("--duration-seconds", type=int, default=30)
     parser.add_argument("--work-size", type=int, default=2_000)
     return parser.parse_args()

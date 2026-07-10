@@ -9,7 +9,7 @@ output "instance_security_group_id" {
 }
 
 output "application_log_group_name" {
-  description = "CloudWatch Logs group reserved for the GreenOps application."
+  description = "CloudWatch Logs group reserved for the Carbontrace application."
   value       = aws_cloudwatch_log_group.application.name
 }
 
@@ -20,7 +20,7 @@ output "instance_id" {
 
 output "dashboard_name" {
   description = "Name of the Terraform-managed CloudWatch dashboard."
-  value       = aws_cloudwatch_dashboard.greenops.dashboard_name
+  value       = aws_cloudwatch_dashboard.carbontrace.dashboard_name
 }
 
 output "auto_stop_rule_name" {

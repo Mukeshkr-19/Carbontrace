@@ -1,1 +1,1 @@
-"""GreenOps workload and measurement modules."""
+"""Carbontrace workload and measurement modules."""

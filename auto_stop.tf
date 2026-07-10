@@ -24,7 +24,7 @@ resource "aws_iam_role" "auto_stop" {
   count              = var.auto_stop_enabled ? 1 : 0
   name_prefix        = "${var.project_name}-auto-stop-"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  description        = "Allows the GreenOps auto-stop function to stop only its profiler instance."
+  description        = "Allows the Carbontrace auto-stop function to stop only its profiler instance."
 }
 
 data "aws_iam_policy_document" "auto_stop" {
@@ -62,7 +62,7 @@ resource "aws_cloudwatch_log_group" "auto_stop" {
 resource "aws_lambda_function" "auto_stop" {
   count            = var.auto_stop_enabled ? 1 : 0
   function_name    = "${var.project_name}-auto-stop"
-  description      = "Periodic circuit breaker for the GreenOps profiler instance."
+  description      = "Periodic circuit breaker for the Carbontrace profiler instance."
   filename         = data.archive_file.auto_stop.output_path
   source_code_hash = data.archive_file.auto_stop.output_base64sha256
   handler          = "auto_stop.handler"
@@ -81,7 +81,7 @@ resource "aws_lambda_function" "auto_stop" {
 resource "aws_cloudwatch_event_rule" "auto_stop" {
   count               = var.auto_stop_enabled ? 1 : 0
   name                = "${var.project_name}-auto-stop"
-  description         = "Runs the GreenOps EC2 auto-stop circuit breaker on a fixed schedule."
+  description         = "Runs the Carbontrace EC2 auto-stop circuit breaker on a fixed schedule."
   schedule_expression = local.auto_stop_schedule
 }
 

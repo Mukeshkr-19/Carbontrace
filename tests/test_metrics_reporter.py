@@ -11,6 +11,7 @@ class MetricsReporterTests(unittest.TestCase):
         summary = RunSummary(
             run_id="test-run-id",
             started_at="2026-07-10T00:00:00+00:00",
+            revision="0123456789abcdef0123456789abcdef01234567",
             workload=WorkloadSummary(1.0, 1, 100, 10_000, 0),
             resources=ResourceSummary(10.0, 20.0, 1.0, 2.0, 1),
             estimated_energy_wh=2.0,
@@ -23,7 +24,7 @@ class MetricsReporterTests(unittest.TestCase):
         client = mock_client.return_value
         client.put_metric_data.assert_called_once()
         kwargs = client.put_metric_data.call_args.kwargs
-        self.assertEqual(kwargs["Namespace"], "GreenOps/App")
+        self.assertEqual(kwargs["Namespace"], "Carbontrace/App")
         self.assertEqual(len(kwargs["MetricData"]), 5)
         dimensions = kwargs["MetricData"][0]["Dimensions"]
         self.assertNotIn("RunId", [dimension["Name"] for dimension in dimensions])

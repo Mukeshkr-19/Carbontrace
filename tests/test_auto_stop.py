@@ -25,3 +25,10 @@ class AutoStopTests(unittest.TestCase):
 
         mock_client.return_value.stop_instances.assert_called_once_with(InstanceIds=["i-0123456789abcdef0"])
         self.assertEqual(result["instance_id"], "i-0123456789abcdef0")
+
+    @patch.dict(os.environ, {"INSTANCE_ID": "all-instances"}, clear=False)
+    def test_handler_rejects_invalid_instance_id(self) -> None:
+        module = load_auto_stop_module()
+
+        with self.assertRaisesRegex(ValueError, "valid EC2 instance ID"):
+            module.handler({}, None)
