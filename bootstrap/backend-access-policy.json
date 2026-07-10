@@ -1,0 +1,33 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadCarbontraceBackendBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::carbontrace-tf-562325340670"
+    },
+    {
+      "Sid": "ReadWriteCarbontraceTerraformState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::carbontrace-tf-562325340670/carbontrace/terraform.tfstate"
+    },
+    {
+      "Sid": "ManageCarbontraceTerraformLockfile",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::carbontrace-tf-562325340670/carbontrace/terraform.tfstate.tflock"
+    }
+  ]
+}

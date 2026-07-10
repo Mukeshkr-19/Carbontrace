@@ -76,7 +76,7 @@ cd ..
 
 Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap state remains local in `bootstrap/terraform.tfstate`; keep it private, do not commit it, and do not delete it. The S3 bucket has `prevent_destroy = true`, so normal infrastructure teardown intentionally retains the backend rather than treating it as a leaked resource.
 
-`bootstrap/deployment-user-policy.json` documents the temporary, bucket-scoped permissions used to create and verify the backend. Terraform does not attach this policy. After backend verification, replace the temporary bucket-configuration write permissions with an ongoing backend-only policy before provisioning the main stack.
+`bootstrap/deployment-user-policy.json` documents the temporary, bucket-scoped permissions used to create and verify the backend. Terraform does not attach this policy. After backend verification, replace it with `bootstrap/backend-access-policy.json`, which keeps only bucket discovery, exact state-object read/write, and exact lockfile read/write/delete access. Restoring or modifying the bootstrap itself later requires temporarily restoring the reviewed bootstrap policy.
 
 ## Deploy
 
@@ -97,6 +97,8 @@ Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap 
 4. Initialize, review, and apply. Never bypass the plan review.
 
    ```bash
+   export AWS_PROFILE=carbontrace
+   export AWS_REGION=us-east-1
    terraform init -backend-config=backend.hcl
    terraform fmt -check -recursive
    terraform validate
