@@ -1,0 +1,26 @@
+# Terraform state, plans, and local overrides
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Python and operating-system files
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+
+# Editor and AI-assistant workspace metadata
+.cursor/
+.codex/
+.vscode/
+
+# Private learning material — intentionally never committed
+.learning/
