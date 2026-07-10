@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
@@ -35,15 +33,6 @@ data "aws_iam_policy_document" "instance" {
       variable = "cloudwatch:namespace"
       values   = ["GreenOps/App", "GreenOps/Host"]
     }
-  }
-
-  statement {
-    sid    = "CreateApplicationLogGroup"
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogGroup",
-    ]
-    resources = [aws_cloudwatch_log_group.application.arn]
   }
 
   statement {
