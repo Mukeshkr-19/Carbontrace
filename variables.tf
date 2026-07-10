@@ -31,3 +31,13 @@ variable "instance_type" {
   type        = string
   default     = "t3.micro"
 }
+
+variable "key_name" {
+  description = "Name of an existing EC2 key pair in the selected AWS Region."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.key_name)) > 0
+    error_message = "key_name must name an existing EC2 key pair."
+  }
+}
