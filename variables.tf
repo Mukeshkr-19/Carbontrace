@@ -41,3 +41,35 @@ variable "key_name" {
     error_message = "key_name must name an existing EC2 key pair."
   }
 }
+
+variable "app_repository_url" {
+  description = "HTTPS URL of the public repository that the instance clones during bootstrap."
+  type        = string
+  default     = "https://github.com/Mukeshkr-19/Carbontrace.git"
+
+  validation {
+    condition     = startswith(var.app_repository_url, "https://")
+    error_message = "app_repository_url must use HTTPS."
+  }
+}
+
+variable "app_revision" {
+  description = "Immutable Git commit SHA that the instance checks out during bootstrap."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.app_revision))
+    error_message = "app_revision must be a 40-character lowercase Git commit SHA."
+  }
+}
+
+variable "run_interval_hours" {
+  description = "Minimum number of hours between automated workload runs."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.run_interval_hours >= 1 && floor(var.run_interval_hours) == var.run_interval_hours
+    error_message = "run_interval_hours must be a whole number of at least 1."
+  }
+}
