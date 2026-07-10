@@ -1,0 +1,3 @@
+# Copy this file to terraform.tfvars and replace the example value.
+# terraform.tfvars is ignored by Git because it can contain environment-specific values.
+my_ip = "203.0.113.10/32"
