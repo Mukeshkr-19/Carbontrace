@@ -1,4 +1,4 @@
-"""Measure the GreenOps workload and optionally publish modeled metrics to CloudWatch."""
+"""Measure Carbontrace and optionally publish modeled metrics to CloudWatch."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from codecarbon import EmissionsTracker
 
 from app.drain_app import WorkloadSummary, run_workload
 
-METRIC_NAMESPACE = "GreenOps/App"
+METRIC_NAMESPACE = "Carbontrace/App"
 WORKLOAD_VERSION = "v1"
 
 
@@ -77,6 +77,7 @@ class RunSummary:
 
     run_id: str
     started_at: str
+    revision: str
     workload: WorkloadSummary
     resources: ResourceSummary
     estimated_energy_wh: float
@@ -96,11 +97,13 @@ def measure_run(duration_seconds: int, work_size: int) -> RunSummary:
     )
     sampler = ProcessSampler()
     sampler.start()
-    tracker.start()
     try:
-        workload = run_workload(duration_seconds, work_size)
+        tracker.start()
+        try:
+            workload = run_workload(duration_seconds, work_size)
+        finally:
+            emissions_kg = tracker.stop() or 0.0
     finally:
-        emissions_kg = tracker.stop() or 0.0
         resources = sampler.stop()
 
     energy_kwh = float(getattr(tracker.final_emissions_data, "energy_consumed", 0.0) or 0.0)
@@ -111,6 +114,7 @@ def measure_run(duration_seconds: int, work_size: int) -> RunSummary:
     return RunSummary(
         run_id=run_id,
         started_at=started_at,
+        revision=os.environ.get("CARBONTRACE_REVISION", "local"),
         workload=workload,
         resources=resources,
         estimated_energy_wh=energy_wh,
@@ -171,11 +175,11 @@ def publish_metrics(summary: RunSummary, project_name: str, instance_type: str, 
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Measure and report a GreenOps workload run.")
+    parser = argparse.ArgumentParser(description="Measure and report a Carbontrace workload run.")
     parser.add_argument("--duration-seconds", type=int, default=30)
     parser.add_argument("--work-size", type=int, default=2_000)
-    parser.add_argument("--project-name", default=os.environ.get("GREENOPS_PROJECT", "carbontrace"))
-    parser.add_argument("--instance-type", default=os.environ.get("GREENOPS_INSTANCE_TYPE", "local"))
+    parser.add_argument("--project-name", default=os.environ.get("CARBONTRACE_PROJECT", "carbontrace"))
+    parser.add_argument("--instance-type", default=os.environ.get("CARBONTRACE_INSTANCE_TYPE", "local"))
     parser.add_argument("--region", default=os.environ.get("AWS_REGION", "us-east-1"))
     parser.add_argument("--publish", action="store_true", help="Send aggregates to CloudWatch.")
     return parser.parse_args()

@@ -1,5 +1,5 @@
 variable "aws_region" {
-  description = "AWS Region in which the GreenOps infrastructure is provisioned."
+  description = "AWS Region in which the Carbontrace infrastructure is provisioned."
   type        = string
   default     = "us-east-1"
 }
@@ -38,9 +38,14 @@ variable "my_ip" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for the later compute phase."
+  description = "EC2 instance type for the bounded Carbontrace proof of concept."
   type        = string
   default     = "t3.micro"
+
+  validation {
+    condition     = var.instance_type == "t3.micro"
+    error_message = "instance_type must remain t3.micro for this cost-bounded proof of concept."
+  }
 }
 
 variable "key_name" {

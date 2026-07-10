@@ -1,85 +1,112 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-install -d -m 0755 /var/log/greenops
-exec >> /var/log/greenops/bootstrap.log 2>&1
+install -d -m 0755 /var/log/carbontrace
+exec >> /var/log/carbontrace/bootstrap.log 2>&1
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git python3 python3-pip python3-venv
+apt-get install -y --no-install-recommends ca-certificates curl git gnupg python3 python3-pip python3-venv
 
 curl --fail --silent --show-error --location \
   --output /tmp/amazon-cloudwatch-agent.deb \
   https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-dpkg -i /tmp/amazon-cloudwatch-agent.deb
-rm -f /tmp/amazon-cloudwatch-agent.deb
+curl --fail --silent --show-error --location \
+  --output /tmp/amazon-cloudwatch-agent.deb.sig \
+  https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb.sig
+curl --fail --silent --show-error --location \
+  --output /tmp/amazon-cloudwatch-agent.gpg \
+  https://amazoncloudwatch-agent.s3.amazonaws.com/assets/amazon-cloudwatch-agent.gpg
 
-id -u greenops >/dev/null 2>&1 || useradd --system --create-home --home-dir /opt/greenops --shell /usr/sbin/nologin greenops
-install -d -o greenops -g greenops -m 0755 /opt/greenops
-chown greenops:greenops /var/log/greenops
+install -d -m 0700 /tmp/amazon-cloudwatch-agent-gnupg
+export GNUPGHOME=/tmp/amazon-cloudwatch-agent-gnupg
+agent_key_fingerprint="$(gpg --batch --show-keys --with-colons /tmp/amazon-cloudwatch-agent.gpg | awk -F: '$1 == "fpr" { print $10; exit }')"
+test "$agent_key_fingerprint" = "937616F3450B7D806CBD9725D58167303B789C72"
+gpg --batch --import /tmp/amazon-cloudwatch-agent.gpg
+gpg --batch --verify /tmp/amazon-cloudwatch-agent.deb.sig /tmp/amazon-cloudwatch-agent.deb
+dpkg -i /tmp/amazon-cloudwatch-agent.deb
+rm -rf /tmp/amazon-cloudwatch-agent.deb /tmp/amazon-cloudwatch-agent.deb.sig \
+  /tmp/amazon-cloudwatch-agent.gpg /tmp/amazon-cloudwatch-agent-gnupg
+unset GNUPGHOME
+
+id -u carbontrace >/dev/null 2>&1 || useradd --system --create-home --home-dir /opt/carbontrace --shell /usr/sbin/nologin carbontrace
+install -d -o carbontrace -g carbontrace -m 0755 /opt/carbontrace /opt/carbontrace/.cache
+chown carbontrace:carbontrace /var/log/carbontrace
 
 REPOSITORY_URL=${jsonencode(app_repository_url)}
 APP_REVISION=${jsonencode(app_revision)}
-git clone --no-checkout "$REPOSITORY_URL" /opt/greenops/app
-git -C /opt/greenops/app checkout --detach "$APP_REVISION"
-git -C /opt/greenops/app rev-parse --verify "$APP_REVISION^{commit}" >/dev/null
-chown -R greenops:greenops /opt/greenops/app
+git clone --no-checkout "$REPOSITORY_URL" /opt/carbontrace/app
+git -C /opt/carbontrace/app checkout --detach "$APP_REVISION"
+git -C /opt/carbontrace/app rev-parse --verify "$APP_REVISION^{commit}" >/dev/null
+chown -R carbontrace:carbontrace /opt/carbontrace/app
 
-runuser -u greenops -- python3 -m venv /opt/greenops/venv
-runuser -u greenops -- /opt/greenops/venv/bin/pip install --disable-pip-version-check --no-cache-dir -r /opt/greenops/app/requirements.txt
+runuser -u carbontrace -- python3 -m venv /opt/carbontrace/venv
+runuser -u carbontrace -- /opt/carbontrace/venv/bin/pip install --disable-pip-version-check --no-cache-dir -r /opt/carbontrace/app/requirements.txt
 
-cat >/opt/greenops/run-reporter.sh <<'SCRIPT'
+cat >/opt/carbontrace/run-reporter.sh <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
 
 metadata_token="$(curl --fail --silent --show-error --request PUT \
+  --connect-timeout 2 --max-time 5 --retry 3 \
   --header 'X-aws-ec2-metadata-token-ttl-seconds: 21600' \
   http://169.254.169.254/latest/api/token)"
 metadata() {
-  curl --fail --silent --show-error \
+  curl --fail --silent --show-error --connect-timeout 2 --max-time 5 --retry 3 \
     --header "X-aws-ec2-metadata-token: $metadata_token" "$1"
 }
 
-export GREENOPS_PROJECT=${jsonencode(project_name)}
-export GREENOPS_INSTANCE_TYPE="$(metadata http://169.254.169.254/latest/meta-data/instance-type)"
+export HOME=/opt/carbontrace
+export XDG_CACHE_HOME=/opt/carbontrace/.cache
+export CARBONTRACE_PROJECT=${jsonencode(project_name)}
+export CARBONTRACE_INSTANCE_TYPE="$(metadata http://169.254.169.254/latest/meta-data/instance-type)"
+export CARBONTRACE_REVISION=${jsonencode(app_revision)}
 export AWS_REGION="$(metadata http://169.254.169.254/latest/meta-data/placement/region)"
-exec /opt/greenops/venv/bin/python -m app.metrics_reporter --publish
+exec /opt/carbontrace/venv/bin/python -m app.metrics_reporter --publish
 SCRIPT
-chmod 0755 /opt/greenops/run-reporter.sh
-chown greenops:greenops /opt/greenops/run-reporter.sh
+chmod 0755 /opt/carbontrace/run-reporter.sh
+chown carbontrace:carbontrace /opt/carbontrace/run-reporter.sh
 
-cat >/etc/systemd/system/greenops-reporter.service <<'UNIT'
+cat >/etc/systemd/system/carbontrace-reporter.service <<'UNIT'
 [Unit]
-Description=GreenOps workload metrics reporter
+Description=Carbontrace workload metrics reporter
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=greenops
-Group=greenops
-WorkingDirectory=/opt/greenops/app
-ExecStart=/bin/bash -c '/opt/greenops/run-reporter.sh >> /var/log/greenops/metrics-reporter.log 2>&1'
+User=carbontrace
+Group=carbontrace
+WorkingDirectory=/opt/carbontrace/app
+ExecStart=/bin/bash -c '/opt/carbontrace/run-reporter.sh >> /var/log/carbontrace/metrics-reporter.log 2>&1'
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/greenops
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
+ReadWritePaths=/var/log/carbontrace /opt/carbontrace/.cache
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
-cat >/etc/systemd/system/greenops-reporter.timer <<UNIT
+cat >/etc/systemd/system/carbontrace-reporter.timer <<UNIT
 [Unit]
-Description=Run the GreenOps workload on a fixed interval
+Description=Run the Carbontrace workload on a fixed interval
 
 [Timer]
 OnBootSec=5min
 OnUnitActiveSec=${run_interval_hours}h
 RandomizedDelaySec=5min
 Persistent=true
-Unit=greenops-reporter.service
+Unit=carbontrace-reporter.service
 
 [Install]
 WantedBy=timers.target
@@ -92,7 +119,7 @@ cat >/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<CONFIG
     "run_as_user": "root"
   },
   "metrics": {
-    "namespace": "GreenOps/Host",
+    "namespace": "Carbontrace/Host",
     "metrics_collected": {
       "cpu": {
         "measurement": ["cpu_usage_idle"],
@@ -109,7 +136,7 @@ cat >/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<CONFIG
       "files": {
         "collect_list": [
           {
-            "file_path": "/var/log/greenops/metrics-reporter.log",
+            "file_path": "/var/log/carbontrace/metrics-reporter.log",
             "log_group_name": ${jsonencode(log_group_name)},
             "log_stream_name": "{instance_id}"
           }
@@ -121,5 +148,5 @@ cat >/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<CONFIG
 CONFIG
 
 systemctl daemon-reload
-systemctl enable --now greenops-reporter.timer
+systemctl enable --now carbontrace-reporter.timer
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json

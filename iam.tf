@@ -13,17 +13,17 @@ data "aws_iam_policy_document" "ec2_assume_role" {
 resource "aws_iam_role" "instance" {
   name_prefix        = "${var.project_name}-instance-"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
-  description        = "Allows the GreenOps EC2 instance to publish only its approved metrics and logs."
+  description        = "Allows the Carbontrace EC2 instance to publish only its approved metrics and logs."
 }
 
 resource "aws_cloudwatch_log_group" "application" {
-  name              = "/aws/greenops/${var.project_name}"
+  name              = "/aws/carbontrace/${var.project_name}"
   retention_in_days = 14
 }
 
 data "aws_iam_policy_document" "instance" {
   statement {
-    sid       = "PublishGreenOpsMetrics"
+    sid       = "PublishCarbontraceMetrics"
     effect    = "Allow"
     actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
@@ -31,7 +31,7 @@ data "aws_iam_policy_document" "instance" {
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = ["GreenOps/App", "GreenOps/Host"]
+      values   = ["Carbontrace/App", "Carbontrace/Host"]
     }
   }
 

@@ -1,4 +1,4 @@
-resource "aws_cloudwatch_dashboard" "greenops" {
+resource "aws_cloudwatch_dashboard" "carbontrace" {
   dashboard_name = "${var.project_name}-dashboard"
 
   dashboard_body = jsonencode({
@@ -10,13 +10,13 @@ resource "aws_cloudwatch_dashboard" "greenops" {
         width  = 12
         height = 6
         properties = {
-          title  = "GreenOps workload CPU utilization"
+          title  = "Carbontrace workload CPU utilization"
           view   = "timeSeries"
           region = var.aws_region
           stat   = "Average"
           period = 300
           metrics = [[
-            "GreenOps/App", "CPUUtilizationCustom", "Project", var.project_name,
+            "Carbontrace/App", "CPUUtilizationCustom", "Project", var.project_name,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Percent", min = 0 } }
@@ -29,13 +29,13 @@ resource "aws_cloudwatch_dashboard" "greenops" {
         width  = 12
         height = 6
         properties = {
-          title  = "GreenOps workload memory utilization"
+          title  = "Carbontrace workload memory utilization"
           view   = "timeSeries"
           region = var.aws_region
           stat   = "Average"
           period = 300
           metrics = [[
-            "GreenOps/App", "MemoryUtilizationPercent", "Project", var.project_name,
+            "Carbontrace/App", "MemoryUtilizationPercent", "Project", var.project_name,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Percent", min = 0 } }
@@ -54,7 +54,7 @@ resource "aws_cloudwatch_dashboard" "greenops" {
           stat   = "Average"
           period = 300
           metrics = [[
-            "GreenOps/App", "EstimatedWatts", "Project", var.project_name,
+            "Carbontrace/App", "EstimatedWatts", "Project", var.project_name,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Watts", min = 0 } }
@@ -73,7 +73,7 @@ resource "aws_cloudwatch_dashboard" "greenops" {
           stat   = "Average"
           period = 300
           metrics = [[
-            "GreenOps/App", "EstimatedCO2Grams", "Project", var.project_name,
+            "Carbontrace/App", "EstimatedCO2Grams", "Project", var.project_name,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Grams CO2e", min = 0 } }

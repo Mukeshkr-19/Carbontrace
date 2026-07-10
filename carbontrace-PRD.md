@@ -2,7 +2,7 @@
 
 **Author:** Sanjay
 **Status:** Active build
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-10
 
 ---
 
@@ -18,14 +18,14 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 
 ## 2. Goals
 
-- Provision all infrastructure via Terraform — zero manual console clicks.
+- Provision all application infrastructure via Terraform — zero manual creation of application resources in the console. Deployment-user policies remain a deliberate human-reviewed prerequisite.
 - Run a Python workload that intentionally wastes CPU/memory ("code smell" / unoptimized loop simulating an inefficient LLM script).
 - Capture CPU%, memory, estimated wattage, and estimated CO2 emissions per run.
 - Push those metrics to CloudWatch as custom metrics.
 - Visualize them on a Terraform-provisioned CloudWatch dashboard.
 - Document methodology honestly, especially around CO2 estimation (it's modeled, not measured — say so).
 - Ship with automatic teardown so nothing runs (or costs money) unattended.
-- Keep an engineering journal in the repo (`docs/build-notes.md`) recording decisions, test evidence, failures, and fixes. This demonstrates learning and ownership, not just a finished result.
+- Keep a detailed private learning journal outside Git, recording decisions, test evidence, failures, fixes, and line-by-line concepts without exposing assistant or editor metadata in the public repository.
 
 ## 3. Non-Goals
 
@@ -65,7 +65,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
         │   └──────────────────┬────────────────────────────┘     │
         │                      │ put_metric_data                  │
         │                      ▼                                  │
-        │        CloudWatch Custom Namespace: GreenOps/App         │
+        │       CloudWatch Custom Namespace: Carbontrace/App       │
         │        - CPUUtilizationCustom                            │
         │        - MemoryUtilization                               │
         │        - EstimatedWatts                                  │
@@ -90,50 +90,50 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 | Metrics collection | Python (`psutil` for CPU/memory; CodeCarbon as the single source of modeled energy/CO2 estimates) |
 | Metrics ingestion | boto3 `put_metric_data` → CloudWatch custom namespace |
 | Dashboard | `aws_cloudwatch_dashboard` (Terraform resource, not console-built) |
-| Teardown | `terraform destroy` (manual) + optional EventBridge/Lambda auto-stop |
-| CI (optional/stretch) | GitHub Actions: `terraform fmt -check`, `terraform validate`, `terraform plan` on PR |
+| Teardown | `terraform destroy` (manual) + EventBridge/Lambda auto-stop |
+| CI | GitHub Actions: Terraform formatting/validation, Python tests, and dependency audit |
 | State backend | S3 with native lockfile (`use_lockfile = true`) |
 
 ## 7. Detailed Requirements by Phase
 
 ### Phase 1 — Infrastructure as Code
 
-- [ ] Bootstrap or document the Terraform backend separately: the S3 bucket must exist before `terraform init`, with `use_lockfile = true`; the project must not silently depend on another repo's state infrastructure
-- [ ] Default VPC data lookup (no custom VPC — see PRD decision log)
-- [ ] Security group: inbound SSH 22 from `var.my_ip` only; outbound all
-- [ ] IAM role + instance profile, policy scoped to required actions only:
+- [x] Bootstrap and document the Terraform backend separately: the S3 bucket exists before `terraform init`, with `use_lockfile = true`; the project does not depend on another repo's state infrastructure
+- [x] Default VPC data lookup (no custom VPC — see PRD decision log)
+- [x] Security group: inbound SSH 22 from `var.my_ip` only; outbound all
+- [x] IAM role + instance profile, policy scoped to required actions only:
   - `cloudwatch:PutMetricData`
   - `logs:CreateLogStream`
   - `logs:PutLogEvents`
   - `logs:DescribeLogStreams` (required by the CloudWatch agent to write to a stream)
-- [ ] EC2 instance: Ubuntu 22.04 AMI (via `data "aws_ami"` filter, not hardcoded ID), `t3.micro`, instance profile attached, SG attached
-- [ ] `user_data` script: installs CloudWatch agent, Python3, pip, git; installs a pinned application revision and `requirements.txt`. The deployed Git commit SHA is recorded as a metric dimension or in run output.
+- [x] EC2 instance configuration: Ubuntu 22.04 AMI (via `data "aws_ami"` filter, not hardcoded ID), `t3.micro`, instance profile attached, SG attached
+- [x] `user_data` configuration: verifies and installs the CloudWatch agent, Python3, pip, git; installs a pinned application revision and pinned `requirements.txt`. The deployed Git commit SHA is recorded in structured run output.
 - [ ] `terraform plan` / `apply` / `destroy` all run clean with no manual intervention
-- [ ] All variables (IP, project name, instance type, region) externalized to `variables.tf` — nothing hardcoded in `main.tf`
+- [x] All variables (IP, project name, instance type, region) externalized to `variables.tf`; the account and cost-sensitive instance type are validated
 - [ ] Phase exit evidence: save a redacted `terraform plan`, a successful apply output, and a successful destroy output in the build notes
 
 ### Phase 2 — Energy Drain Application
 
-- [ ] `drain_app.py`: intentionally unoptimized workload — e.g., nested loops doing redundant recomputation, unnecessary large in-memory data structures, no caching, single-threaded where parallelism would be trivial. Comment clearly *why* each inefficiency is there (this is a teaching artifact, not sloppy code).
-- [ ] `metrics_reporter.py`:
+- [x] `drain_app.py`: intentionally unoptimized workload — redundant recomputation and an unnecessary but bounded in-memory allocation are clearly documented as teaching artifacts.
+- [x] `metrics_reporter.py`:
   - Uses `psutil` to sample CPU% and memory usage every 1s during the run
   - Uses CodeCarbon (`EmissionsTracker`) as the authoritative estimator for energy (kWh) and CO2 (g) for the run
   - Derives average estimated watts as `estimated_Wh / elapsed_hours`; it does not introduce a second CPU/TDP-based power model
   - Aggregates samples, computes a run summary (avg/peak CPU, avg/peak memory, duration, total estimated Wh, average estimated watts, total estimated CO2g)
-- [ ] Both scripts run standalone locally first (validate output makes sense) before deploying to EC2
+- [x] Both scripts run standalone locally before EC2 deployment; a real local CodeCarbon-modeled result was produced
 - [ ] Deployed to EC2 via `user_data` or a simple `scp` deploy script — document whichever you pick
-- [ ] Runs on a schedule via `cron` or `systemd` timer (not just manual invocation) — this is the "automated pipeline" part of the pitch
-- [ ] Each run receives a unique `RunId`; output is written locally before metrics are sent, so failed metric publishing can be diagnosed
+- [x] A hardened `systemd` service and timer are configured for scheduled runs
+- [x] Each run receives a unique `RunId`, records the exact deployed revision, and writes structured output before metrics are sent
 
 ### Phase 3 — Observability Dashboard
 
-- [ ] `metrics_reporter.py` pushes to CloudWatch custom namespace (e.g., `GreenOps/App`) via boto3:
+- [x] `metrics_reporter.py` pushes to the `Carbontrace/App` CloudWatch custom namespace via boto3:
   - `CPUUtilizationCustom` (%)
   - `MemoryUtilizationPercent` (%)
   - `EstimatedWatts`
   - `EstimatedCO2Grams`
-- [ ] Every custom metric uses stable dimensions: `Project`, `InstanceType`, and `WorkloadVersion`. `RunId` is recorded in structured logs rather than as a metric dimension, avoiding unnecessary metric-cardinality cost.
-- [ ] `aws_cloudwatch_dashboard` Terraform resource defining:
+- [x] Every custom metric uses stable dimensions: `Project`, `InstanceType`, and `WorkloadVersion`. `RunId` and revision are recorded in structured logs rather than metric dimensions.
+- [x] `aws_cloudwatch_dashboard` Terraform resource defines:
   - Line widget: CPU% over time
   - Line widget: Memory over time
   - Line/number widget: Estimated CO2g / Watts per run
@@ -142,20 +142,20 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 
 ### Phase 4 — Teardown & Cost Hygiene
 
-- [ ] `terraform destroy` documented as the standard end-of-session step
-- [ ] EventBridge scheduled rule → Lambda that stops (not terminates) the EC2 instance after a configurable N hours, so a forgotten session doesn't run indefinitely. README explains that stopped instances can still incur EBS charges and that `terraform destroy` remains the final cleanup step.
-- [ ] README includes an explicit "How to tear this down" section
+- [x] `terraform destroy` documented as the standard end-of-session step
+- [x] EventBridge scheduled rule → Lambda stops only the profiler EC2 instance after a configurable N hours; stopped-instance EBS costs and final destroy are documented
+- [x] README includes an explicit teardown section
 
 ### Phase 5 — Documentation
 
-- [ ] README.md includes:
+- [x] README.md includes:
   - One-paragraph project summary (what it does, why)
   - Architecture diagram (ASCII is fine, or draw.io export)
   - **Methodology section**: CodeCarbon is the single modeling source for energy and emissions; average watts are derived from its estimated energy and the recorded duration. Cite CodeCarbon's methodology and state relevant configuration assumptions.
   - Explicit statement that these are *estimates*, not hardware-measured values, and why (no power telemetry access on EC2)
   - Setup instructions (`terraform init/plan/apply`, deploy steps)
   - Teardown instructions
-  - Dashboard screenshot
+  - [ ] Dashboard screenshot after real AWS runs
   - **Forward-looking note**: this profiler is architected so the "unoptimized loop" workload can be swapped for a real LLM inference workload later — turning this PoC into a general instrumentation harness for measuring model efficiency. (This is the sentence that connects it to Imran's research — don't bury it.)
 
 ## 8. Decision Log
@@ -198,13 +198,16 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 - README is readable by someone with zero context and clearly explains the estimation methodology.
 - No AWS costs incurred beyond Free Tier during development.
 - Sanjay can explain the data flow, IAM permissions, estimation limitations, and one debugging decision without relying on the README.
-- `docs/build-notes.md` shows at least three meaningful observations or fixes made during implementation.
+- The private ignored learning journal shows at least three meaningful observations or fixes made during implementation.
 
-## 11. Open Questions
+## 11. Remaining execution gates
 
-- Final call on EventBridge/Lambda auto-stop: build it after the core pipeline works. It is part of the final project, but must not delay evidence of the core workload-to-dashboard flow.
-- Should the "swap in a real LLM workload" extension actually be built, or just described as future work in the README? (Recommendation: describe only, for now — don't scope-creep before Phase 1–5 ship.)
+- Human review and attachment of the permanent backend and main deployment policies.
+- Saved main-stack plan review before apply.
+- Real EC2 bootstrap, at least three runs, CloudWatch metric/log/dashboard evidence, and auto-stop verification.
+- Saved destroy plan/apply and read-only cleanup verification.
+- Final dashboard evidence and results section in the README.
 
 ---
 
-*Use this doc as the spec when prompting Codex/Cursor — reference section numbers (e.g. "implement Phase 1, section 7") rather than re-explaining context each time.*
+*Use this document as the project specification and completion checklist.*

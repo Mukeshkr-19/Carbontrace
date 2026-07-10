@@ -28,13 +28,13 @@ Terraform
    |       |
    |       +--> CloudWatch agent --> host metrics + application log group
    |
-   +--> CloudWatch dashboard (GreenOps/App)
+   +--> CloudWatch dashboard (Carbontrace/App)
    +--> EventBridge rule --> Lambda --> stop this EC2 instance
 ```
 
 ## Metrics and methodology
 
-The reporter samples the current Python process at one-second intervals and publishes aggregate values in the `GreenOps/App` namespace:
+The reporter samples the current Python process at one-second intervals and publishes aggregate values in the `Carbontrace/App` namespace:
 
 | Metric | Meaning |
 |---|---|
@@ -44,7 +44,7 @@ The reporter samples the current Python process at one-second intervals and publ
 | `EstimatedWatts` | `EstimatedEnergyWh / elapsed hours`; an average modeled power value |
 | `EstimatedCO2Grams` | CodeCarbon modeled CO2e, converted from kg to grams |
 
-The fixed metric dimensions are `Project`, `InstanceType`, and `WorkloadVersion`. A unique run ID is emitted in the structured application log but deliberately not as a metric dimension, which keeps CloudWatch metric cardinality and cost under control. CloudWatch custom metrics are organized by namespace, metric name, and dimensions; each published metric uses the AWS `PutMetricData` API. [AWS CloudWatch custom-metrics documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html)
+The fixed metric dimensions are `Project`, `InstanceType`, and `WorkloadVersion`. Each structured run log records both a unique run ID and the exact deployed Git revision, but deliberately keeps those high-cardinality values out of metric dimensions. CloudWatch custom metrics are organized by namespace, metric name, and dimensions; each published metric uses the AWS `PutMetricData` API. [AWS CloudWatch custom-metrics documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html)
 
 ### Estimation limits
 
@@ -78,6 +78,10 @@ Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap 
 
 `bootstrap/deployment-user-policy.json` documents the temporary, bucket-scoped permissions used to create and verify the backend. Terraform does not attach this policy. After backend verification, replace it with `bootstrap/backend-access-policy.json`, which keeps only bucket discovery, exact state-object read/write, and exact lockfile read/write/delete access. Restoring or modifying the bootstrap itself later requires temporarily restoring the reviewed bootstrap policy.
 
+`bootstrap/main-deployment-policy.json` is the separate, human-reviewed policy for the main application stack. It contains no wildcard action names. Project resources are scoped to Carbontrace ARNs or tags wherever AWS supports resource-level authorization. Its discovery statement uses `Resource: "*"` only for read/list APIs that AWS does not support scoping to an ARN. Review and attach this policy manually before planning the main stack; Terraform never modifies the deployment user's own permissions.
+
+After bootstrap verification, the deployment user should have two reviewed inline policies: `CarbontraceTerraformBackend` from `bootstrap/backend-access-policy.json` and `CarbontraceTerraformDeployment` from `bootstrap/main-deployment-policy.json`. Remove the temporary `CarbontraceTerraformBootstrap` policy after the permanent backend policy is saved. Do not combine the temporary bucket-creation permissions with ongoing deployment access.
+
 ## Deploy
 
 1. Create a private local variable file. It is ignored by Git.
@@ -109,8 +113,8 @@ Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap 
 5. Confirm the timer and reporter after the instance boots:
 
    ```bash
-   sudo systemctl status greenops-reporter.timer
-   sudo journalctl -u greenops-reporter.service
+   sudo systemctl status carbontrace-reporter.timer
+   sudo journalctl -u carbontrace-reporter.service
    ```
 
 The first scheduled run occurs after the five-minute boot delay plus a small randomized delay. The CloudWatch dashboard is created during `terraform apply`; add a screenshot here after at least three real scheduled runs.
@@ -131,7 +135,9 @@ Do not pass `--publish` locally unless your environment has appropriately scoped
 - SSH ingress is restricted to the one `/32` address supplied in `terraform.tfvars`; there is no `0.0.0.0/0` inbound rule.
 - The EC2 root volume is encrypted, uses `gp3`, and is deleted when the instance terminates.
 - The instance requires IMDSv2 and disables instance metadata tags. The bootstrap script acquires an IMDSv2 token before reading instance data. [AWS IMDSv2 documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html)
-- The application runs as the unprivileged `greenops` system user with a hardened systemd service.
+- The application runs as the unprivileged `carbontrace` system user with a hardened systemd service.
+- The EC2 bootstrap verifies the CloudWatch agent package signature against AWS's documented signing-key fingerprint before installation.
+- Application dependency versions are pinned and audited before deployment.
 - The instance role can publish only the approved CloudWatch namespaces and write only to the project log group.
 - The auto-stop Lambda can stop only the profiler instance, and its execution log group has a 14-day retention policy.
 - Terraform state, `.tfvars`, plans, and local virtual environments are excluded from version control. Do not put credentials, private keys, or backend values in tracked files.
