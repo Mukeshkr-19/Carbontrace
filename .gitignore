@@ -17,13 +17,5 @@ __pycache__/
 .venv/
 .DS_Store
 
-# Editor and AI-assistant workspace metadata
-.cursor/
-.codex/
-.vscode/
-
 # Private learning material — intentionally never committed
 .learning/
-
-# Separate local worktree used for Cursor tasks
-.worktrees/
