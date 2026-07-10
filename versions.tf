@@ -2,7 +2,7 @@ terraform {
   required_version = ">= 1.6.0"
 
   # Values are supplied with `terraform init -backend-config=backend.hcl`.
-  # The bucket and lock table are bootstrapped separately from this stack.
+  # The state bucket is bootstrapped separately from this stack.
   backend "s3" {}
 
   required_providers {
