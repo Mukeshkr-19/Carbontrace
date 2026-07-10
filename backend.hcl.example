@@ -1,9 +1,10 @@
 # Copy this file to backend.hcl. It is intentionally not version controlled.
 # Initialize the root module with:
 # AWS_PROFILE=carbontrace terraform init -backend-config=backend.hcl
-bucket       = "carbontrace-tf-562325340670"
-key          = "carbontrace/terraform.tfstate"
-region       = "us-east-1"
-profile      = "carbontrace"
-encrypt      = true
-use_lockfile = true
+bucket              = "carbontrace-tf-562325340670"
+key                 = "carbontrace/terraform.tfstate"
+region              = "us-east-1"
+profile             = "carbontrace"
+allowed_account_ids = ["562325340670"]
+encrypt             = true
+use_lockfile        = true
