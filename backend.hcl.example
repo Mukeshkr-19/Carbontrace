@@ -1,0 +1,8 @@
+# Copy this file outside version control, fill in your pre-created backend values,
+# then run: terraform init -backend-config=backend.hcl
+#
+# bucket         = "your-terraform-state-bucket"
+# key            = "greenops-profiler/terraform.tfstate"
+# region         = "us-east-1"
+# dynamodb_table = "your-terraform-lock-table"
+# encrypt        = true
