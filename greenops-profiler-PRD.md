@@ -103,7 +103,6 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 - [ ] Security group: inbound SSH 22 from `var.my_ip` only; outbound all
 - [ ] IAM role + instance profile, policy scoped to required actions only:
   - `cloudwatch:PutMetricData`
-  - `logs:CreateLogGroup`
   - `logs:CreateLogStream`
   - `logs:PutLogEvents`
   - `logs:DescribeLogStreams` (required by the CloudWatch agent to write to a stream)
