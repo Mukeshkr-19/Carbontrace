@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Short project name used in resource names and tags."
   type        = string
-  default     = "greenops-profiler"
+  default     = "carbontrace"
 
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.project_name))
