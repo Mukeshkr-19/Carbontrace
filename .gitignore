@@ -24,3 +24,6 @@ __pycache__/
 
 # Private learning material — intentionally never committed
 .learning/
+
+# Separate local worktree used for Cursor tasks
+.worktrees/
