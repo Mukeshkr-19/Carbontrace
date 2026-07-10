@@ -106,6 +106,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
   - `logs:CreateLogGroup`
   - `logs:CreateLogStream`
   - `logs:PutLogEvents`
+  - `logs:DescribeLogStreams` (required by the CloudWatch agent to write to a stream)
 - [ ] EC2 instance: Ubuntu 22.04 AMI (via `data "aws_ami"` filter, not hardcoded ID), `t3.micro`, instance profile attached, SG attached
 - [ ] `user_data` script: installs CloudWatch agent, Python3, pip, git; installs a pinned application revision and `requirements.txt`. The deployed Git commit SHA is recorded as a metric dimension or in run output.
 - [ ] `terraform plan` / `apply` / `destroy` all run clean with no manual intervention
@@ -132,7 +133,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
   - `MemoryUtilizationPercent` (%)
   - `EstimatedWatts`
   - `EstimatedCO2Grams`
-- [ ] Every custom metric uses consistent dimensions: `Project`, `InstanceType`, `RunId`, and `WorkloadVersion`. Keep dimension cardinality controlled; `RunId` is used for per-run metrics only.
+- [ ] Every custom metric uses stable dimensions: `Project`, `InstanceType`, and `WorkloadVersion`. `RunId` is recorded in structured logs rather than as a metric dimension, avoiding unnecessary metric-cardinality cost.
 - [ ] `aws_cloudwatch_dashboard` Terraform resource defining:
   - Line widget: CPU% over time
   - Line widget: Memory over time

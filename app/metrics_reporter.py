@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import threading
 import time
@@ -183,7 +184,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     summary = measure_run(args.duration_seconds, args.work_size)
-    print(asdict(summary))
+    print(json.dumps(asdict(summary), default=str))
     if args.publish:
         publish_metrics(summary, args.project_name, args.instance_type, args.region)
 

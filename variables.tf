@@ -73,3 +73,20 @@ variable "run_interval_hours" {
     error_message = "run_interval_hours must be a whole number of at least 1."
   }
 }
+
+variable "auto_stop_enabled" {
+  description = "Whether the EventBridge circuit breaker may stop the profiler instance periodically."
+  type        = bool
+  default     = true
+}
+
+variable "auto_stop_interval_hours" {
+  description = "Maximum number of hours an instance may run before the periodic auto-stop guardrail acts."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.auto_stop_interval_hours >= 1 && floor(var.auto_stop_interval_hours) == var.auto_stop_interval_hours
+    error_message = "auto_stop_interval_hours must be a whole number of at least 1."
+  }
+}

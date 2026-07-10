@@ -17,3 +17,13 @@ output "instance_id" {
   description = "ID of the EC2 profiler instance."
   value       = aws_instance.profiler.id
 }
+
+output "dashboard_name" {
+  description = "Name of the Terraform-managed CloudWatch dashboard."
+  value       = aws_cloudwatch_dashboard.greenops.dashboard_name
+}
+
+output "auto_stop_rule_name" {
+  description = "Name of the EventBridge auto-stop rule, or null when disabled."
+  value       = var.auto_stop_enabled ? aws_cloudwatch_event_rule.auto_stop[0].name : null
+}
