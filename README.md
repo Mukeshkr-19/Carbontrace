@@ -60,6 +60,22 @@ Treat measurements as useful for comparing controlled workload versions, not as 
 - a pre-created S3 state bucket and DynamoDB lock table
 - a public GitHub repository, because the EC2 bootstrap clones a pinned HTTPS revision
 
+### Bootstrap the state backend
+
+The `bootstrap/` directory is a deliberately separate Terraform root module. Run it once before initializing the main stack; it creates a versioned, encrypted, publicly blocked S3 bucket and a DynamoDB lock table with point-in-time recovery.
+
+```bash
+cd bootstrap
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars and choose a globally unique state_bucket_name.
+terraform init
+terraform plan -out=tfplan
+terraform apply tfplan
+cd ..
+```
+
+Use the two bootstrap outputs to fill your private `backend.hcl` file. Do not run `terraform destroy` in `bootstrap/` until the main stack has been destroyed and its state is no longer needed.
+
 ## Deploy
 
 1. Create a private local variable file. It is ignored by Git.
@@ -74,7 +90,7 @@ Treat measurements as useful for comparing controlled workload versions, not as 
    git rev-parse HEAD
    ```
 
-3. Create a private `backend.hcl` from `backend.hcl.example`, using your S3 bucket and DynamoDB table names.
+3. Create a private `backend.hcl` from `backend.hcl.example`, using the S3 bucket and DynamoDB table names created by `bootstrap/`.
 
 4. Initialize, review, and apply. Never bypass the plan review.
 
