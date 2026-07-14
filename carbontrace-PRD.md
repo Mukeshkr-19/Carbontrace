@@ -2,7 +2,7 @@
 
 **Author:** Sanjay
 **Status:** Active build
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-13
 
 ---
 
@@ -18,7 +18,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 
 ## 2. Goals
 
-- Provision all application infrastructure via Terraform — zero manual creation of application resources in the console. Deployment-user policies remain a deliberate human-reviewed prerequisite.
+- Provision application resources via Terraform while keeping two narrowly scoped runtime IAM roles and the EC2 instance profile as explicit administrator-created security prerequisites.
 - Run a Python workload that intentionally wastes CPU/memory ("code smell" / unoptimized loop simulating an inefficient LLM script).
 - Capture CPU%, memory, estimated wattage, and estimated CO2 emissions per run.
 - Push those metrics to CloudWatch as custom metrics.
@@ -36,7 +36,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 
 ## 4. Constraints
 
-- **Cost:** Free Tier only during development. `t3.micro` for all dev/test runs. `t3.medium` only for a single final "official run" if desired, and only with auto-shutdown active.
+- **Cost:** `t3.micro` only for every development, test, and final run; both Terraform validation and IAM launch conditions reject other instance types.
 - **Security:** SSH restricted to a single IP (`/32` CIDR), no `0.0.0.0/0` inbound ever. Prefer AWS Systems Manager Session Manager if it is added later, then remove SSH entirely. IAM actions are explicitly scoped; where AWS requires resource wildcards (for example, CloudWatch metric publishing), document why.
 - **Cost hygiene:** No instance may run unattended without a teardown mechanism (manual `terraform destroy` at minimum; EventBridge + Lambda auto-stop is the stretch goal).
 - **Honesty:** CO2/wattage figures must be labeled as estimates in both code comments and README, with the estimation method cited.
@@ -75,7 +75,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
         │        CloudWatch Dashboard (Terraform-managed)          │
         │        - CPU widget / Memory widget / CO2-Watts widget   │
         │                                                          │
-        │        EventBridge rule (optional) → Lambda → stop EC2   │
+        │        EventBridge rule → Lambda → stop EC2              │
         └───────────────────────────────────────────────────┘
 ```
 
@@ -86,7 +86,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 | IaC | Terraform (AWS provider ~> 5.0) |
 | Compute | EC2, Ubuntu 22.04 LTS, t3.micro |
 | Networking | Default VPC + custom Security Group |
-| IAM | Custom least-privilege role + instance profile |
+| IAM | Administrator-created narrow runtime roles/profile; Terraform reads and passes exact identities only |
 | Metrics collection | Python (`psutil` for CPU/memory; CodeCarbon as the single source of modeled energy/CO2 estimates) |
 | Metrics ingestion | boto3 `put_metric_data` → CloudWatch custom namespace |
 | Dashboard | `aws_cloudwatch_dashboard` (Terraform resource, not console-built) |
@@ -101,13 +101,15 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 - [x] Bootstrap and document the Terraform backend separately: the S3 bucket exists before `terraform init`, with `use_lockfile = true`; the project does not depend on another repo's state infrastructure
 - [x] Default VPC data lookup (no custom VPC — see PRD decision log)
 - [x] Security group: inbound SSH 22 from `var.my_ip` only; outbound all
-- [x] IAM role + instance profile, policy scoped to required actions only:
+- [ ] Administrator creates the exact EC2/Lambda runtime roles and EC2 instance profile from the reviewed files under `bootstrap/runtime-roles/`
+- [x] Terraform references the exact pre-existing roles/profile and has no role, role-policy, or instance-profile resources
+- [x] Runtime policies are scoped to required actions only:
   - `cloudwatch:PutMetricData`
   - `logs:CreateLogStream`
   - `logs:PutLogEvents`
   - `logs:DescribeLogStreams` (required by the CloudWatch agent to write to a stream)
 - [x] EC2 instance configuration: Ubuntu 22.04 AMI (via `data "aws_ami"` filter, not hardcoded ID), `t3.micro`, instance profile attached, SG attached
-- [x] `user_data` configuration: verifies and installs the CloudWatch agent, Python3, pip, git; installs a pinned application revision and pinned `requirements.txt`. The deployed Git commit SHA is recorded in structured run output.
+- [x] `user_data` configuration: verifies and installs a version-pinned CloudWatch agent, Python3, pip, and git; installs a pinned application revision and a hash-locked transitive Python environment. The deployed Git commit SHA is recorded in structured run output.
 - [ ] `terraform plan` / `apply` / `destroy` all run clean with no manual intervention
 - [x] All variables (IP, project name, instance type, region) externalized to `variables.tf`; the account and cost-sensitive instance type are validated
 - [ ] Phase exit evidence: save a redacted `terraform plan`, a successful apply output, and a successful destroy output in the build notes
@@ -143,7 +145,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 ### Phase 4 — Teardown & Cost Hygiene
 
 - [x] `terraform destroy` documented as the standard end-of-session step
-- [x] EventBridge scheduled rule → Lambda stops only the profiler EC2 instance after a configurable N hours; stopped-instance EBS costs and final destroy are documented
+- [x] EventBridge scheduled rule → Lambda stops only the profiler EC2 instance after a configurable N hours; a CloudWatch alarm exposes Lambda failures; stopped-instance EBS costs and final destroy are documented
 - [x] README includes an explicit teardown section
 
 ### Phase 5 — Documentation
@@ -167,7 +169,7 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 | Instance type (dev) | t3.micro | Free tier eligible; t3.medium is NOT free tier |
 | CO2 measurement | CodeCarbon (single modeled source) | Avoids mixing incompatible estimators; no hardware power telemetry access on EC2, so values remain estimates |
 | Wattage metric | Derived from estimated Wh / run duration | A transparent derived value, not a claimed hardware reading |
-| IAM scope | Required actions only, with documented AWS-required resource wildcards | Least privilege and honest operational documentation |
+| IAM scope | Pre-existing narrow runtime roles; deployment user has exact read/PassRole only | Removes the create-policy/pass-role privilege-escalation chain |
 | Reproducibility | Pinned application revision + documented backend bootstrap | A clean apply must not depend on an unstated branch or another project |
 
 ## 9. Milestones / Sessions (2 hrs/day)
@@ -192,17 +194,18 @@ A small, fully IaC-provisioned pipeline that runs a deliberately unoptimized wor
 
 ## 10. Success Criteria
 
-- `terraform apply` from a clean clone reproduces the entire stack with zero manual steps.
+- After the documented one-time backend and runtime-identity prerequisites, `terraform apply` from a clean clone reproduces the application stack with zero console-built application resources.
 - Dashboard shows real CPU/memory/CO2 data from at least 3 separate runs.
 - `terraform destroy` cleanly removes the main application infrastructure, verified via `aws ec2 describe-instances`; the separately bootstrapped state bucket is intentionally retained and protected by `prevent_destroy`.
 - README is readable by someone with zero context and clearly explains the estimation methodology.
-- No AWS costs incurred beyond Free Tier during development.
+- AWS usage is reviewed after each run and remains within the account's applicable credits, allowance, or explicitly accepted small budget; Free Tier is not treated as a universal zero-cost guarantee.
 - Sanjay can explain the data flow, IAM permissions, estimation limitations, and one debugging decision without relying on the README.
 - The private ignored learning journal shows at least three meaningful observations or fixes made during implementation.
 
 ## 11. Remaining execution gates
 
-- Human review and attachment of the permanent backend and main deployment policies.
+- Administrator creation and human verification of the exact runtime roles and instance profile.
+- Human review and attachment of the permanent backend and revised main deployment policies.
 - Saved main-stack plan review before apply.
 - Real EC2 bootstrap, at least three runs, CloudWatch metric/log/dashboard evidence, and auto-stop verification.
 - Saved destroy plan/apply and read-only cleanup verification.

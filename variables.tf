@@ -2,6 +2,11 @@ variable "aws_region" {
   description = "AWS Region in which the Carbontrace infrastructure is provisioned."
   type        = string
   default     = "us-east-1"
+
+  validation {
+    condition     = var.aws_region == "us-east-1"
+    error_message = "Carbontrace must run only in us-east-1."
+  }
 }
 
 variable "aws_account_id" {
@@ -16,24 +21,95 @@ variable "aws_account_id" {
 }
 
 variable "project_name" {
-  description = "Short project name used in resource names and tags."
+  description = "Lowercase project identifier used in AWS resource names."
   type        = string
   default     = "carbontrace"
 
   validation {
-    condition     = can(regex("^[a-z0-9-]+$", var.project_name))
-    error_message = "project_name may contain only lowercase letters, digits, and hyphens."
+    condition     = var.project_name == "carbontrace"
+    error_message = "project_name must remain carbontrace; the reviewed IAM policies and runtime-role conditions are scoped to this exact name."
+  }
+}
+
+variable "project_tag" {
+  description = "Canonical Project tag and metric-dimension value."
+  type        = string
+  default     = "Carbontrace"
+
+  validation {
+    condition     = var.project_tag == "Carbontrace"
+    error_message = "project_tag must be exactly Carbontrace."
   }
 }
 
 variable "my_ip" {
-  description = "Trusted public IPv4 address allowed to use SSH, in CIDR notation (for example, 203.0.113.10/32)."
+  description = "Globally routable public IPv4 address allowed to use SSH, expressed as exactly one /32 CIDR."
   type        = string
   sensitive   = true
 
   validation {
-    condition     = can(cidrhost(var.my_ip, 0)) && endswith(var.my_ip, "/32")
-    error_message = "my_ip must be a single IPv4 address in /32 CIDR notation."
+    condition = try(
+      length(regexall("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.my_ip)) == 1 &&
+      alltrue([
+        for octet in split(".", split("/", var.my_ip)[0]) :
+        tonumber(octet) >= 0 && tonumber(octet) <= 255
+      ]) &&
+      !(
+        tonumber(split(".", split("/", var.my_ip)[0])[0]) == 0 ||
+        tonumber(split(".", split("/", var.my_ip)[0])[0]) == 10 ||
+        tonumber(split(".", split("/", var.my_ip)[0])[0]) == 127 ||
+        tonumber(split(".", split("/", var.my_ip)[0])[0]) >= 224 ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 100 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) >= 64 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) <= 127
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 169 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 254
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 172 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) >= 16 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) <= 31
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 192 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 168
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 192 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 0 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[2]) == 0
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 192 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 0 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[2]) == 2
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 192 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 88 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[2]) == 99
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 198 &&
+          contains([18, 19], tonumber(split(".", split("/", var.my_ip)[0])[1]))
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 198 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 51 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[2]) == 100
+        ) ||
+        (
+          tonumber(split(".", split("/", var.my_ip)[0])[0]) == 203 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[1]) == 0 &&
+          tonumber(split(".", split("/", var.my_ip)[0])[2]) == 113
+        )
+      ),
+      false,
+    )
+    error_message = "my_ip must be a globally routable public IPv4 /32; private, shared, loopback, link-local, documentation, benchmark, multicast, reserved, IPv6, 0.0.0.0/32, and wider CIDRs are rejected."
   }
 }
 

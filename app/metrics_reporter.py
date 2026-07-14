@@ -178,7 +178,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Measure and report a Carbontrace workload run.")
     parser.add_argument("--duration-seconds", type=int, default=30)
     parser.add_argument("--work-size", type=int, default=2_000)
-    parser.add_argument("--project-name", default=os.environ.get("CARBONTRACE_PROJECT", "carbontrace"))
+    parser.add_argument("--project-name", default=os.environ.get("CARBONTRACE_PROJECT", "Carbontrace"))
     parser.add_argument("--instance-type", default=os.environ.get("CARBONTRACE_INSTANCE_TYPE", "local"))
     parser.add_argument("--region", default=os.environ.get("AWS_REGION", "us-east-1"))
     parser.add_argument("--publish", action="store_true", help="Send aggregates to CloudWatch.")

@@ -1,6 +1,6 @@
 # Copy this file to terraform.tfvars and replace the example value.
 # terraform.tfvars is ignored by Git because it can contain environment-specific values.
-my_ip = "203.0.113.10/32"
+my_ip = "REPLACE_WITH_YOUR_PUBLIC_IPV4/32"
 key_name = "your-existing-ec2-key-pair"
 
 # Use the full commit SHA of a reviewed repository revision, not a branch name.

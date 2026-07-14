@@ -18,5 +18,12 @@ __pycache__/
 .venv/
 .DS_Store
 
+# Credentials and local environment files
+.env
+.env.*
+*.pem
+*.key
+.aws/
+
 # Private learning material — intentionally never committed
 .learning/

@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StopOnlyTaggedCarbontraceInstances",
+      "Effect": "Allow",
+      "Action": "ec2:StopInstances",
+      "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/Name": "carbontrace-profiler",
+          "ec2:ResourceTag/Project": "Carbontrace"
+        }
+      }
+    },
+    {
+      "Sid": "WriteOnlyCarbontraceAutoStopLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop:*"
+    }
+  ]
+}

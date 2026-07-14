@@ -19,7 +19,7 @@ class MetricsReporterTests(unittest.TestCase):
             estimated_co2_grams=0.5,
         )
 
-        publish_metrics(summary, "carbontrace", "t3.micro", "us-east-1")
+        publish_metrics(summary, "Carbontrace", "t3.micro", "us-east-1")
 
         client = mock_client.return_value
         client.put_metric_data.assert_called_once()
@@ -29,6 +29,23 @@ class MetricsReporterTests(unittest.TestCase):
         dimensions = kwargs["MetricData"][0]["Dimensions"]
         self.assertNotIn("RunId", [dimension["Name"] for dimension in dimensions])
         self.assertEqual(kwargs["MetricData"][0]["Timestamp"].year, 2026)
+
+    @patch("app.metrics_reporter.boto3.client")
+    def test_publish_propagates_cloudwatch_failure(self, mock_client) -> None:
+        summary = RunSummary(
+            run_id="test-run-id",
+            started_at="2026-07-10T00:00:00+00:00",
+            revision="0123456789abcdef0123456789abcdef01234567",
+            workload=WorkloadSummary(1.0, 1, 100, 10_000, 0),
+            resources=ResourceSummary(10.0, 20.0, 1.0, 2.0, 1),
+            estimated_energy_wh=2.0,
+            estimated_watts=7.2,
+            estimated_co2_grams=0.5,
+        )
+        mock_client.return_value.put_metric_data.side_effect = RuntimeError("CloudWatch unavailable")
+
+        with self.assertRaisesRegex(RuntimeError, "CloudWatch unavailable"):
+            publish_metrics(summary, "Carbontrace", "t3.micro", "us-east-1")
 
 
 if __name__ == "__main__":
