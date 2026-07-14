@@ -1,4 +1,4 @@
-# Carbontrace — AWS GreenOps Profiler
+# Carbontrace — AWS Carbon-Footprint Profiler
 
 Carbontrace is a small, infrastructure-as-code pipeline that runs a deliberately inefficient Python workload on EC2, measures its CPU and memory behavior, models its energy and CO2e impact, and publishes the results to a Terraform-managed CloudWatch dashboard.
 
@@ -6,7 +6,7 @@ It is a research-adjacent instrumentation proof of concept, not a hardware power
 
 ## What this demonstrates
 
-- Terraform-managed AWS infrastructure, dashboard, IAM, and shutdown guardrails
+- Terraform-managed application infrastructure with administrator-created, narrowly scoped runtime identities
 - least-privilege workload identity and IMDSv2-only instance metadata access
 - process-level CPU and memory sampling with custom CloudWatch metrics
 - modeled energy and CO2e reporting through CodeCarbon
@@ -18,6 +18,7 @@ It is a research-adjacent instrumentation proof of concept, not a hardware power
 ```text
 Terraform
    |
+   +--> Read pre-existing EC2/Lambda runtime roles (no IAM mutation)
    +--> Default VPC + SSH-only security group
    +--> EC2 (Ubuntu 22.04, encrypted EBS, IMDSv2 required)
    |       |
@@ -54,10 +55,11 @@ Treat measurements as useful for comparing controlled workload versions, not as 
 
 ## Prerequisites
 
-- Terraform 1.6 or later
+- Terraform 1.11 or later (required for native S3 `use_lockfile` state locking)
 - AWS CLI credentials for the target AWS account and `us-east-1`
 - an existing EC2 key pair in that Region
 - a pre-created S3 state bucket
+- the two administrator-created runtime roles and exact EC2 instance profile documented in `bootstrap/runtime-roles/README.md`
 - a public GitHub repository, because the EC2 bootstrap clones a pinned HTTPS revision
 
 ### Bootstrap the state backend
@@ -74,13 +76,25 @@ terraform apply bootstrap.tfplan
 cd ..
 ```
 
-Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap state remains local in `bootstrap/terraform.tfstate`; keep it private, do not commit it, and do not delete it. The S3 bucket has `prevent_destroy = true`, so normal infrastructure teardown intentionally retains the backend rather than treating it as a leaked resource.
+Use the bootstrap output to fill your private `backend.hcl` file. The bootstrap state remains local in `bootstrap/terraform.tfstate`; keep it private, do not commit it, and do not delete it. If that local state is lost, recover ownership explicitly before making changes:
+
+```bash
+cd bootstrap
+terraform import aws_s3_bucket.state carbontrace-tf-562325340670
+terraform import aws_s3_bucket_versioning.state carbontrace-tf-562325340670
+terraform import aws_s3_bucket_server_side_encryption_configuration.state carbontrace-tf-562325340670
+terraform import aws_s3_bucket_public_access_block.state carbontrace-tf-562325340670
+```
+
+The S3 bucket has `prevent_destroy = true`, so normal infrastructure teardown intentionally retains the backend rather than treating it as a leaked resource.
 
 `bootstrap/deployment-user-policy.json` documents the temporary, bucket-scoped permissions used to create and verify the backend. Terraform does not attach this policy. After backend verification, replace it with `bootstrap/backend-access-policy.json`, which keeps only bucket discovery, exact state-object read/write, and exact lockfile read/write/delete access. Restoring or modifying the bootstrap itself later requires temporarily restoring the reviewed bootstrap policy.
 
-`bootstrap/main-deployment-policy.json` is the separate, human-reviewed policy for the main application stack. It contains no wildcard action names. Project resources are scoped to Carbontrace ARNs or tags wherever AWS supports resource-level authorization. Its discovery statement uses `Resource: "*"` only for read/list APIs that AWS does not support scoping to an ARN. Review and attach this policy manually before planning the main stack; Terraform never modifies the deployment user's own permissions.
+`bootstrap/main-deployment-policy.json` is the separate, human-reviewed policy for the main application stack. It cannot create, modify, attach, or delete IAM roles, policies, or instance profiles. It can read only the two exact runtime roles and exact instance profile, and each `iam:PassRole` grant is bound to one role and one expected AWS service. It contains no wildcard action names. Review it manually before attachment; Terraform never modifies the deployment user's own permissions.
 
-After bootstrap verification, the deployment user should have two reviewed inline policies: `CarbontraceTerraformBackend` from `bootstrap/backend-access-policy.json` and `CarbontraceTerraformDeployment` from `bootstrap/main-deployment-policy.json`. Remove the temporary `CarbontraceTerraformBootstrap` policy after the permanent backend policy is saved. Do not combine the temporary bucket-creation permissions with ongoing deployment access.
+An administrator must create the narrow runtime identities once using the exact trust and permissions documents under `bootstrap/runtime-roles/`. Terraform treats them as read-only data sources. This separation prevents the deployment user from writing a more powerful role policy and then executing code through EC2 or Lambda.
+
+After the runtime identities and revised deployment architecture are reviewed, the deployment user should have two reviewed inline policies: `CarbontraceTerraformBackend` from `bootstrap/backend-access-policy.json` and `CarbontraceTerraformDeployment` from `bootstrap/main-deployment-policy.json`. Remove the temporary `CarbontraceTerraformBootstrap` policy only after the permanent backend policy is saved and backend maintenance is complete. Do not combine temporary bucket-creation permissions with ongoing deployment access.
 
 ## Deploy
 
@@ -90,7 +104,7 @@ After bootstrap verification, the deployment user should have two reviewed inlin
    cp terraform.tfvars.example terraform.tfvars
    ```
 
-2. Fill in `my_ip` with your current public address followed by `/32`, your existing `key_name`, and a full reviewed commit SHA for `app_revision`.
+2. Fill in `my_ip` with your current public address followed by `/32`, your existing `key_name`, and a full reviewed commit SHA for `app_revision`. The SHA must exist on the public remote because the instance clones the repository over HTTPS.
 
    ```bash
    git rev-parse HEAD
@@ -123,21 +137,30 @@ The first scheduled run occurs after the five-minute boot delay plus a small ran
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install --require-hashes -r requirements.txt
 .venv/bin/python -m app.metrics_reporter --duration-seconds 30 --work-size 2000
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
 Do not pass `--publish` locally unless your environment has appropriately scoped AWS credentials and you intend to publish metrics.
 
+When intentionally updating a top-level dependency, edit `requirements.in` and regenerate the Python 3.10-compatible lock with:
+
+```bash
+uv pip compile --python-version 3.10 --generate-hashes --no-header requirements.in -o requirements.txt
+```
+
 ## Security controls
 
 - SSH ingress is restricted to the one `/32` address supplied in `terraform.tfvars`; there is no `0.0.0.0/0` inbound rule.
+- The SSH input validation accepts only globally routable public IPv4 `/32` values and rejects private, shared, loopback, link-local, documentation, benchmark, multicast, reserved, IPv6, and wider CIDRs.
+- The Region and instance type are fixed by validation to `us-east-1` and `t3.micro`.
+- The deployment user cannot create or alter runtime IAM identities; it can pass only `carbontrace-ec2-role` to EC2 and `carbontrace-auto-stop-role` to Lambda.
 - The EC2 root volume is encrypted, uses `gp3`, and is deleted when the instance terminates.
 - The instance requires IMDSv2 and disables instance metadata tags. The bootstrap script acquires an IMDSv2 token before reading instance data. [AWS IMDSv2 documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html)
 - The application runs as the unprivileged `carbontrace` system user with a hardened systemd service.
-- The EC2 bootstrap verifies the CloudWatch agent package signature against AWS's documented signing-key fingerprint before installation.
-- Application dependency versions are pinned and audited before deployment.
+- The EC2 bootstrap installs a version-pinned CloudWatch agent package and verifies its signature against AWS's documented signing-key fingerprint before installation.
+- Direct dependencies are declared in `requirements.in`; the complete transitive environment is hash-locked in `requirements.txt`, installed with `--require-hashes`, and audited in CI.
 - The instance role can publish only the approved CloudWatch namespaces and write only to the project log group.
 - The auto-stop Lambda can stop only the profiler instance, and its execution log group has a 14-day retention policy.
 - Terraform state, `.tfvars`, plans, and local virtual environments are excluded from version control. Do not put credentials, private keys, or backend values in tracked files.
@@ -146,12 +169,17 @@ Do not pass `--publish` locally unless your environment has appropriately scoped
 
 - Development defaults to `t3.micro`.
 - The EventBridge/Lambda circuit breaker is enabled by default and periodically stops the instance. It is a backstop, not a substitute for cleanup.
+- A CloudWatch alarm records any auto-stop Lambda error so circuit-breaker failures are visible.
 - A stopped EC2 instance can still incur EBS charges.
+- [Free Tier eligibility](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier.html) depends on the account creation date and remaining credits or legacy allowance; it is not a guarantee of zero cost.
+- The instance uses a public IPv4 address for SSH and package downloads. [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/) lists `$0.005` per public IPv4 address-hour when the account's applicable free allowance or credits do not cover it.
 
-When finished, remove the complete stack:
+When finished, create and review a saved destroy plan, then apply only that plan:
 
 ```bash
-terraform destroy
+terraform plan -destroy -out=destroy.tfplan
+terraform show destroy.tfplan
+terraform apply destroy.tfplan
 ```
 
 This destroys the main Carbontrace infrastructure only. It does not destroy the separately bootstrapped state bucket, which is protected by `prevent_destroy = true` and must be retained while any Terraform state depends on it.
@@ -160,7 +188,7 @@ Then verify that the instance is gone:
 
 ```bash
 aws ec2 describe-instances \
-  --filters "Name=tag:Project,Values=carbontrace" \
+  --filters "Name=tag:Project,Values=Carbontrace" \
   --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name}' \
   --output table
 ```

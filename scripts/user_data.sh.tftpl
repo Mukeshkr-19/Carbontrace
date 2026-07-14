@@ -8,12 +8,14 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl git gnupg python3 python3-pip python3-venv
 
+CLOUDWATCH_AGENT_VERSION="1.300069.0b1529"
+CLOUDWATCH_AGENT_BASE_URL="https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/$CLOUDWATCH_AGENT_VERSION"
 curl --fail --silent --show-error --location \
   --output /tmp/amazon-cloudwatch-agent.deb \
-  https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+  "$CLOUDWATCH_AGENT_BASE_URL/amazon-cloudwatch-agent.deb"
 curl --fail --silent --show-error --location \
   --output /tmp/amazon-cloudwatch-agent.deb.sig \
-  https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb.sig
+  "$CLOUDWATCH_AGENT_BASE_URL/amazon-cloudwatch-agent.deb.sig"
 curl --fail --silent --show-error --location \
   --output /tmp/amazon-cloudwatch-agent.gpg \
   https://amazoncloudwatch-agent.s3.amazonaws.com/assets/amazon-cloudwatch-agent.gpg
@@ -32,6 +34,8 @@ unset GNUPGHOME
 id -u carbontrace >/dev/null 2>&1 || useradd --system --create-home --home-dir /opt/carbontrace --shell /usr/sbin/nologin carbontrace
 install -d -o carbontrace -g carbontrace -m 0755 /opt/carbontrace /opt/carbontrace/.cache
 chown carbontrace:carbontrace /var/log/carbontrace
+chmod 0750 /var/log/carbontrace
+usermod --append --groups carbontrace cwagent
 
 REPOSITORY_URL=${jsonencode(app_repository_url)}
 APP_REVISION=${jsonencode(app_revision)}
@@ -41,7 +45,7 @@ git -C /opt/carbontrace/app rev-parse --verify "$APP_REVISION^{commit}" >/dev/nu
 chown -R carbontrace:carbontrace /opt/carbontrace/app
 
 runuser -u carbontrace -- python3 -m venv /opt/carbontrace/venv
-runuser -u carbontrace -- /opt/carbontrace/venv/bin/pip install --disable-pip-version-check --no-cache-dir -r /opt/carbontrace/app/requirements.txt
+runuser -u carbontrace -- /opt/carbontrace/venv/bin/pip install --disable-pip-version-check --no-cache-dir --require-hashes -r /opt/carbontrace/app/requirements.txt
 
 cat >/opt/carbontrace/run-reporter.sh <<'SCRIPT'
 #!/usr/bin/env bash
@@ -90,7 +94,7 @@ ProtectKernelTunables=true
 RestrictSUIDSGID=true
 LockPersonality=true
 CapabilityBoundingSet=
-UMask=0077
+UMask=0027
 ReadWritePaths=/var/log/carbontrace /opt/carbontrace/.cache
 
 [Install]
@@ -116,7 +120,8 @@ cat >/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<CONFIG
 {
   "agent": {
     "metrics_collection_interval": 60,
-    "run_as_user": "root"
+    "run_as_user": "cwagent",
+    "usage_data": false
   },
   "metrics": {
     "namespace": "Carbontrace/Host",

@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.11.0"
 
   # Values are supplied with `terraform init -backend-config=backend.hcl`.
   # The state bucket is bootstrapped separately from this stack.

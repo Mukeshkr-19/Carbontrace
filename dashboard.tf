@@ -16,7 +16,7 @@ resource "aws_cloudwatch_dashboard" "carbontrace" {
           stat   = "Average"
           period = 300
           metrics = [[
-            "Carbontrace/App", "CPUUtilizationCustom", "Project", var.project_name,
+            "Carbontrace/App", "CPUUtilizationCustom", "Project", var.project_tag,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Percent", min = 0 } }
@@ -35,7 +35,7 @@ resource "aws_cloudwatch_dashboard" "carbontrace" {
           stat   = "Average"
           period = 300
           metrics = [[
-            "Carbontrace/App", "MemoryUtilizationPercent", "Project", var.project_name,
+            "Carbontrace/App", "MemoryUtilizationPercent", "Project", var.project_tag,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Percent", min = 0 } }
@@ -54,7 +54,7 @@ resource "aws_cloudwatch_dashboard" "carbontrace" {
           stat   = "Average"
           period = 300
           metrics = [[
-            "Carbontrace/App", "EstimatedWatts", "Project", var.project_name,
+            "Carbontrace/App", "EstimatedWatts", "Project", var.project_tag,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Watts", min = 0 } }
@@ -73,10 +73,29 @@ resource "aws_cloudwatch_dashboard" "carbontrace" {
           stat   = "Average"
           period = 300
           metrics = [[
-            "Carbontrace/App", "EstimatedCO2Grams", "Project", var.project_name,
+            "Carbontrace/App", "EstimatedCO2Grams", "Project", var.project_tag,
             "InstanceType", var.instance_type, "WorkloadVersion", "v1",
           ]]
           yAxis = { left = { label = "Grams CO2e", min = 0 } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Modeled energy per workload run"
+          view   = "timeSeries"
+          region = var.aws_region
+          stat   = "Average"
+          period = 300
+          metrics = [[
+            "Carbontrace/App", "EstimatedEnergyWh", "Project", var.project_tag,
+            "InstanceType", var.instance_type, "WorkloadVersion", "v1",
+          ]]
+          yAxis = { left = { label = "Watt-hours", min = 0 } }
         }
       },
     ]

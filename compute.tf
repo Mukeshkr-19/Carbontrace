@@ -30,7 +30,7 @@ resource "aws_instance" "profiler" {
   instance_type               = var.instance_type
   subnet_id                   = sort(data.aws_subnets.default_vpc.ids)[0]
   vpc_security_group_ids      = [aws_security_group.instance.id]
-  iam_instance_profile        = aws_iam_instance_profile.instance.name
+  iam_instance_profile        = data.aws_iam_instance_profile.instance.name
   key_name                    = var.key_name
   associate_public_ip_address = true
   monitoring                  = false
@@ -38,7 +38,7 @@ resource "aws_instance" "profiler" {
     app_repository_url = var.app_repository_url
     app_revision       = var.app_revision
     log_group_name     = aws_cloudwatch_log_group.application.name
-    project_name       = var.project_name
+    project_name       = var.project_tag
     run_interval_hours = var.run_interval_hours
   })
   user_data_replace_on_change = true
@@ -55,6 +55,12 @@ resource "aws_instance" "profiler" {
     delete_on_termination = true
     volume_type           = "gp3"
     volume_size           = 8
+  }
+
+  volume_tags = {
+    ManagedBy = "Terraform"
+    Name      = "${var.project_name}-profiler-root"
+    Project   = var.project_tag
   }
 
   tags = {

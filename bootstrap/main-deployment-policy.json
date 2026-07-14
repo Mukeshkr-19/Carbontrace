@@ -2,13 +2,14 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ReadAccountAndRegionalInfrastructure",
+      "Sid": "ReadUsEast1Infrastructure",
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeAccountAttributes",
         "ec2:DescribeAvailabilityZones",
         "ec2:DescribeImages",
         "ec2:DescribeInstanceAttribute",
+        "ec2:DescribeInstanceCreditSpecifications",
         "ec2:DescribeInstances",
         "ec2:DescribeInstanceStatus",
         "ec2:DescribeInstanceTypes",
@@ -18,12 +19,45 @@
         "ec2:DescribeSubnets",
         "ec2:DescribeTags",
         "ec2:DescribeVolumes",
+        "ec2:DescribeVpcAttribute",
         "ec2:DescribeVpcs",
-        "iam:ListInstanceProfiles",
-        "logs:DescribeLogGroups",
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
+      "Sid": "ReadCallerIdentity",
+      "Effect": "Allow",
+      "Action": [
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "ReadExactRuntimeRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:ListRoleTags"
+      ],
+      "Resource": [
+        "arn:aws:iam::562325340670:role/carbontrace-ec2-role",
+        "arn:aws:iam::562325340670:role/carbontrace-auto-stop-role"
+      ]
+    },
+    {
+      "Sid": "ReadExactEc2InstanceProfile",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetInstanceProfile",
+        "iam:ListInstanceProfileTags"
+      ],
+      "Resource": "arn:aws:iam::562325340670:instance-profile/carbontrace-ec2-profile"
     },
     {
       "Sid": "LaunchOnlyCostBoundedProfilerInstance",
@@ -34,7 +68,7 @@
       "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
       "Condition": {
         "StringEquals": {
-          "aws:RequestTag/Project": "carbontrace",
+          "aws:RequestTag/Project": "Carbontrace",
           "ec2:InstanceType": "t3.micro"
         }
       }
@@ -66,12 +100,12 @@
       ],
       "Condition": {
         "StringEquals": {
-          "aws:RequestTag/Project": "carbontrace"
+          "aws:RequestTag/Project": "Carbontrace"
         }
       }
     },
     {
-      "Sid": "ManageOnlyCarbontraceEc2Resources",
+      "Sid": "ManageOnlyCarbontraceSecurityGroups",
       "Effect": "Allow",
       "Action": [
         "ec2:AuthorizeSecurityGroupEgress",
@@ -83,7 +117,7 @@
       "Resource": "arn:aws:ec2:us-east-1:562325340670:security-group/*",
       "Condition": {
         "StringEquals": {
-          "aws:ResourceTag/Project": "carbontrace"
+          "aws:ResourceTag/Project": "Carbontrace"
         }
       }
     },
@@ -97,7 +131,7 @@
       "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
       "Condition": {
         "StringEquals": {
-          "aws:ResourceTag/Project": "carbontrace"
+          "aws:ResourceTag/Project": "Carbontrace"
         }
       }
     },
@@ -121,6 +155,7 @@
           ]
         },
         "StringEquals": {
+          "aws:RequestTag/Project": "Carbontrace",
           "ec2:CreateAction": [
             "CreateSecurityGroup",
             "RunInstances"
@@ -129,51 +164,28 @@
       }
     },
     {
-      "Sid": "ManageCarbontraceRoles",
-      "Effect": "Allow",
-      "Action": [
-        "iam:CreateRole",
-        "iam:DeleteRole",
-        "iam:DeleteRolePolicy",
-        "iam:GetRole",
-        "iam:GetRolePolicy",
-        "iam:ListAttachedRolePolicies",
-        "iam:ListInstanceProfilesForRole",
-        "iam:ListRolePolicies",
-        "iam:PutRolePolicy",
-        "iam:TagRole",
-        "iam:UntagRole",
-        "iam:UpdateAssumeRolePolicy"
-      ],
-      "Resource": "arn:aws:iam::562325340670:role/carbontrace-*"
-    },
-    {
-      "Sid": "ManageCarbontraceInstanceProfiles",
-      "Effect": "Allow",
-      "Action": [
-        "iam:AddRoleToInstanceProfile",
-        "iam:CreateInstanceProfile",
-        "iam:DeleteInstanceProfile",
-        "iam:GetInstanceProfile",
-        "iam:RemoveRoleFromInstanceProfile",
-        "iam:TagInstanceProfile",
-        "iam:UntagInstanceProfile"
-      ],
-      "Resource": "arn:aws:iam::562325340670:instance-profile/carbontrace-*"
-    },
-    {
-      "Sid": "PassOnlyCarbontraceRolesToExpectedServices",
+      "Sid": "PassCarbontraceEc2RoleOnly",
       "Effect": "Allow",
       "Action": [
         "iam:PassRole"
       ],
-      "Resource": "arn:aws:iam::562325340670:role/carbontrace-*",
+      "Resource": "arn:aws:iam::562325340670:role/carbontrace-ec2-role",
       "Condition": {
         "StringEquals": {
-          "iam:PassedToService": [
-            "ec2.amazonaws.com",
-            "lambda.amazonaws.com"
-          ]
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "PassCarbontraceLambdaRoleOnly",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::562325340670:role/carbontrace-auto-stop-role",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
         }
       }
     },
@@ -214,6 +226,7 @@
         "lambda:CreateFunction",
         "lambda:DeleteFunction",
         "lambda:GetFunction",
+        "lambda:GetFunctionCodeSigningConfig",
         "lambda:GetFunctionConfiguration",
         "lambda:GetPolicy",
         "lambda:ListTags",
@@ -225,6 +238,19 @@
         "lambda:UpdateFunctionConfiguration"
       ],
       "Resource": "arn:aws:lambda:us-east-1:562325340670:function:carbontrace-auto-stop"
+    },
+    {
+      "Sid": "ManageCarbontraceAutoStopAlarm",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:ListTagsForResource",
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:TagResource",
+        "cloudwatch:UntagResource"
+      ],
+      "Resource": "arn:aws:cloudwatch:us-east-1:562325340670:alarm:carbontrace-auto-stop-errors"
     },
     {
       "Sid": "ManageCarbontraceAutoStopSchedule",

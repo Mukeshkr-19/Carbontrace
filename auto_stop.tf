@@ -8,49 +8,9 @@ data "archive_file" "auto_stop" {
   output_path = "${path.module}/.terraform/auto_stop.zip"
 }
 
-data "aws_iam_policy_document" "lambda_assume_role" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "auto_stop" {
-  count              = var.auto_stop_enabled ? 1 : 0
-  name_prefix        = "${var.project_name}-auto-stop-"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  description        = "Allows the Carbontrace auto-stop function to stop only its profiler instance."
-}
-
-data "aws_iam_policy_document" "auto_stop" {
-  statement {
-    sid       = "StopOnlyProfilerInstance"
-    effect    = "Allow"
-    actions   = ["ec2:StopInstances"]
-    resources = [aws_instance.profiler.arn]
-  }
-
-  statement {
-    sid    = "WriteOwnExecutionLogs"
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-    resources = ["${aws_cloudwatch_log_group.auto_stop[0].arn}:*"]
-  }
-}
-
-resource "aws_iam_role_policy" "auto_stop" {
-  count       = var.auto_stop_enabled ? 1 : 0
-  name_prefix = "${var.project_name}-auto-stop-"
-  role        = aws_iam_role.auto_stop[0].id
-  policy      = data.aws_iam_policy_document.auto_stop.json
+data "aws_iam_role" "auto_stop" {
+  count = var.auto_stop_enabled ? 1 : 0
+  name  = local.auto_stop_role_name
 }
 
 resource "aws_cloudwatch_log_group" "auto_stop" {
@@ -68,7 +28,7 @@ resource "aws_lambda_function" "auto_stop" {
   handler          = "auto_stop.handler"
   runtime          = "python3.12"
   architectures    = ["arm64"]
-  role             = aws_iam_role.auto_stop[0].arn
+  role             = data.aws_iam_role.auto_stop[0].arn
   timeout          = 15
 
   environment {
@@ -98,4 +58,22 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   function_name = aws_lambda_function.auto_stop[0].function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.auto_stop[0].arn
+}
+
+resource "aws_cloudwatch_metric_alarm" "auto_stop_errors" {
+  count               = var.auto_stop_enabled ? 1 : 0
+  alarm_name          = "${var.project_name}-auto-stop-errors"
+  alarm_description   = "Signals when the Carbontrace auto-stop circuit breaker fails."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    FunctionName = aws_lambda_function.auto_stop[0].function_name
+  }
 }

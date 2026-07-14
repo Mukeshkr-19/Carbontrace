@@ -4,7 +4,7 @@ output "default_vpc_id" {
 }
 
 output "instance_security_group_id" {
-  description = "ID of the security group that will be attached to the EC2 instance in the next phase."
+  description = "ID of the security group attached to the EC2 profiler instance."
   value       = aws_security_group.instance.id
 }
 
