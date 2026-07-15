@@ -218,12 +218,24 @@
       "Effect": "Allow",
       "Action": [
         "logs:ListTagsForResource",
-        "logs:TagResource",
         "logs:UntagResource"
       ],
       "Resource": [
         "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace",
         "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop"
+      ]
+    },
+    {
+      "Sid": "TagCarbontraceLogGroupsDuringCreation",
+      "Effect": "Allow",
+      "Action": [
+        "logs:TagResource"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace",
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace:*",
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop",
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop:*"
       ]
     },
     {
