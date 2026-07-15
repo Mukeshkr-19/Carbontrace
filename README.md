@@ -35,23 +35,38 @@ Terraform
 
 ## Metrics and methodology
 
-The reporter samples the current Python process at one-second intervals and publishes aggregate values in the `Carbontrace/App` namespace:
+The reporter samples the current Python process at one-second intervals and publishes aggregate values in the `Carbontrace/App` namespace. It validates every value as finite and non-negative before creating the CloudWatch client, so one invalid value cannot silently poison the five-metric batch.
 
-| Metric | Meaning |
-|---|---|
-| `CPUUtilizationCustom` | Average sampled process CPU usage (%) |
-| `MemoryUtilizationPercent` | Average sampled process memory usage (%) |
-| `EstimatedEnergyWh` | CodeCarbon modeled energy consumption, converted from kWh to Wh |
-| `EstimatedWatts` | `EstimatedEnergyWh / elapsed hours`; an average modeled power value |
-| `EstimatedCO2Grams` | CodeCarbon modeled CO2e, converted from kg to grams |
+| Metric | CloudWatch unit | Meaning |
+|---|---|---|
+| `CPUUtilizationCustom` | `Percent` | Average sampled process CPU usage (%) |
+| `MemoryUtilizationPercent` | `Percent` | Average sampled process memory usage (%) |
+| `EstimatedEnergyWh` | `None` | CodeCarbon modeled energy consumption, converted from kWh to Wh |
+| `EstimatedWatts` | `None` | `EstimatedEnergyWh / elapsed hours`; an average modeled power value |
+| `EstimatedCO2Grams` | `None` | CodeCarbon modeled CO2e, converted from kg to grams |
 
-The fixed metric dimensions are `Project`, `InstanceType`, and `WorkloadVersion`. Each structured run log records both a unique run ID and the exact deployed Git revision, but deliberately keeps those high-cardinality values out of metric dimensions. CloudWatch custom metrics are organized by namespace, metric name, and dimensions; each published metric uses the AWS `PutMetricData` API. [AWS CloudWatch custom-metrics documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html)
+CloudWatch has no `Watts`, watt-hours, or grams standard unit. Those three modeled metrics therefore use the supported `None` unit and carry their semantic unit in the metric name and dashboard label. Supplying an unsupported unit rejects the complete `PutMetricData` request. [AWS CloudWatch metric units](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Metric)
+
+The fixed metric dimensions are `Project`, `InstanceType`, and `WorkloadVersion`. Each structured run log records both a unique run ID and the exact deployed Git revision, but deliberately keeps those high-cardinality values out of metric dimensions. CloudWatch custom metrics are organized by namespace, metric name, and dimensions; each published metric uses one bounded `PutMetricData` call with standard retries, three total attempts, a three-second connection timeout, and a five-second read timeout. [AWS CloudWatch custom-metrics documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html)
+
+Every run emits a `measurement_complete` JSON record. A publishing run emits `publish_success` only after CloudWatch accepts the entire request. A rejected request emits `publish_failure` with a non-sensitive error type/code and then exits nonzero so systemd records the failure.
+
+### Estimator configuration
+
+The reporter uses CodeCarbon's offline tracker with an explicit, reproducible configuration:
+
+- `tracking_mode="process"` aligns modeled energy and emissions with the process-level CPU and memory measurements.
+- AWS deployment region `us-east-1` is recorded in every run and maps to CodeCarbon's bundled Virginia state electricity-mix model (`country_iso_code="USA"`, `region="virginia"`). This is a stable regional approximation, not live grid carbon intensity and not an AWS facility-specific measurement.
+- `pue=1.0` is explicit. It intentionally excludes unverified data-center cooling and power-distribution overhead rather than inventing an AWS facility PUE.
+- The run record includes the CodeCarbon version, tracking mode, AWS provider/region, carbon country/region and methodology, effective modeled carbon intensity, and PUE.
+
+Only `us-east-1` currently has a reviewed Carbontrace methodology mapping. The reporter fails closed for another AWS Region until its mapping and assumptions are reviewed. See the [CodeCarbon tracker parameters](https://docs.codecarbon.io/latest/reference/api/) and [CodeCarbon methodology](https://docs.codecarbon.io/3.2/explanation/methodology/).
 
 ### Estimation limits
 
-Energy, power, and CO2e values are **modeled estimates**, not readings from physical EC2 power telemetry. CodeCarbon models energy and emissions from measured/estimated compute activity and carbon-intensity information; its documented relationship is energy consumption multiplied by carbon intensity. [CodeCarbon methodology](https://docs.codecarbon.io/3.2/explanation/methodology/)
+Energy, power, and CO2e values are **modeled estimates**, not readings from physical EC2 power telemetry. CPU and memory are sampled from the reporter process; CodeCarbon estimates that process's energy and applies its bundled Virginia electricity-mix model. Average watts are derived from modeled Wh divided by elapsed hours.
 
-Treat measurements as useful for comparing controlled workload versions, not as an exact statement of the physical electricity consumed by one EC2 instance. Results may vary with host hardware, underlying cloud infrastructure, region, instance behavior, workload duration, and the estimator’s assumptions.
+Treat measurements as useful for comparing controlled workload versions under the same pinned environment and methodology, not as an exact statement of physical electricity or CO2e consumed by an EC2 instance. Results may vary with host hardware, noisy-neighbor behavior, estimator hardware models, sampling, workload duration, and the age/coverage of the bundled electricity data. PUE 1.0 means the results exclude facility overhead.
 
 ## Prerequisites
 
