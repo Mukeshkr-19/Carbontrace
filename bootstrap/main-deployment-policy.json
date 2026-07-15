@@ -95,14 +95,23 @@
         "ec2:CreateSecurityGroup"
       ],
       "Resource": [
-        "arn:aws:ec2:us-east-1:562325340670:security-group/*",
-        "arn:aws:ec2:us-east-1:562325340670:vpc/*"
+        "arn:aws:ec2:us-east-1:562325340670:security-group/*"
       ],
       "Condition": {
         "StringEquals": {
           "aws:RequestTag/Project": "Carbontrace"
         }
       }
+    },
+    {
+      "Sid": "UseVpcForCarbontraceSecurityGroupCreation",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSecurityGroup"
+      ],
+      "Resource": [
+        "arn:aws:ec2:us-east-1:562325340670:vpc/*"
+      ]
     },
     {
       "Sid": "ManageOnlyCarbontraceSecurityGroups",
@@ -195,8 +204,20 @@
       "Action": [
         "logs:CreateLogGroup",
         "logs:DeleteLogGroup",
+        "logs:PutRetentionPolicy"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace",
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace:*",
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop",
+        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop:*"
+      ]
+    },
+    {
+      "Sid": "TagCarbontraceLogGroups",
+      "Effect": "Allow",
+      "Action": [
         "logs:ListTagsForResource",
-        "logs:PutRetentionPolicy",
         "logs:TagResource",
         "logs:UntagResource"
       ],
