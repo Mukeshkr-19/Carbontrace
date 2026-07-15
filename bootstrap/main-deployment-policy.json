@@ -2,7 +2,6 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ReadUsEast1Infrastructure",
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeAccountAttributes",
@@ -31,7 +30,6 @@
       }
     },
     {
-      "Sid": "ReadCallerIdentity",
       "Effect": "Allow",
       "Action": [
         "sts:GetCallerIdentity"
@@ -39,7 +37,6 @@
       "Resource": "*"
     },
     {
-      "Sid": "ReadExactRuntimeRoles",
       "Effect": "Allow",
       "Action": [
         "iam:GetRole",
@@ -51,7 +48,6 @@
       ]
     },
     {
-      "Sid": "ReadExactEc2InstanceProfile",
       "Effect": "Allow",
       "Action": [
         "iam:GetInstanceProfile",
@@ -60,7 +56,6 @@
       "Resource": "arn:aws:iam::562325340670:instance-profile/carbontrace-ec2-profile"
     },
     {
-      "Sid": "LaunchOnlyCostBoundedProfilerInstance",
       "Effect": "Allow",
       "Action": [
         "ec2:RunInstances"
@@ -74,7 +69,6 @@
       }
     },
     {
-      "Sid": "UseRequiredEc2LaunchResources",
       "Effect": "Allow",
       "Action": [
         "ec2:RunInstances"
@@ -89,7 +83,6 @@
       ]
     },
     {
-      "Sid": "CreateCarbontraceSecurityGroup",
       "Effect": "Allow",
       "Action": [
         "ec2:CreateSecurityGroup"
@@ -104,7 +97,6 @@
       }
     },
     {
-      "Sid": "UseVpcForCarbontraceSecurityGroupCreation",
       "Effect": "Allow",
       "Action": [
         "ec2:CreateSecurityGroup"
@@ -114,7 +106,6 @@
       ]
     },
     {
-      "Sid": "ManageOnlyCarbontraceSecurityGroups",
       "Effect": "Allow",
       "Action": [
         "ec2:AuthorizeSecurityGroupEgress",
@@ -131,7 +122,6 @@
       }
     },
     {
-      "Sid": "StopOrTerminateOnlyCarbontraceInstances",
       "Effect": "Allow",
       "Action": [
         "ec2:StopInstances",
@@ -145,7 +135,6 @@
       }
     },
     {
-      "Sid": "TagResourcesOnlyDuringCarbontraceCreation",
       "Effect": "Allow",
       "Action": [
         "ec2:CreateTags"
@@ -173,7 +162,6 @@
       }
     },
     {
-      "Sid": "PassCarbontraceEc2RoleOnly",
       "Effect": "Allow",
       "Action": [
         "iam:PassRole"
@@ -186,7 +174,6 @@
       }
     },
     {
-      "Sid": "PassCarbontraceLambdaRoleOnly",
       "Effect": "Allow",
       "Action": [
         "iam:PassRole"
@@ -199,7 +186,6 @@
       }
     },
     {
-      "Sid": "ManageCarbontraceLogGroups",
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
@@ -214,7 +200,6 @@
       ]
     },
     {
-      "Sid": "TagCarbontraceLogGroups",
       "Effect": "Allow",
       "Action": [
         "logs:ListTagsForResource",
@@ -226,7 +211,6 @@
       ]
     },
     {
-      "Sid": "TagCarbontraceLogGroupsDuringCreation",
       "Effect": "Allow",
       "Action": [
         "logs:TagResource"
@@ -239,7 +223,6 @@
       ]
     },
     {
-      "Sid": "ManageCarbontraceDashboard",
       "Effect": "Allow",
       "Action": [
         "cloudwatch:DeleteDashboards",
@@ -252,7 +235,6 @@
       "Resource": "arn:aws:cloudwatch::562325340670:dashboard/carbontrace-dashboard"
     },
     {
-      "Sid": "ManageCarbontraceAutoStopFunction",
       "Effect": "Allow",
       "Action": [
         "lambda:AddPermission",
@@ -273,7 +255,6 @@
       "Resource": "arn:aws:lambda:us-east-1:562325340670:function:carbontrace-auto-stop"
     },
     {
-      "Sid": "ManageCarbontraceAutoStopAlarm",
       "Effect": "Allow",
       "Action": [
         "cloudwatch:DeleteAlarms",
@@ -286,7 +267,6 @@
       "Resource": "arn:aws:cloudwatch:us-east-1:562325340670:alarm:carbontrace-auto-stop-errors"
     },
     {
-      "Sid": "ManageCarbontraceAutoStopSchedule",
       "Effect": "Allow",
       "Action": [
         "events:DeleteRule",
