@@ -42,6 +42,7 @@ APP_REVISION=${jsonencode(app_revision)}
 git clone --no-checkout "$REPOSITORY_URL" /opt/carbontrace/app
 git -C /opt/carbontrace/app checkout --detach "$APP_REVISION"
 git -C /opt/carbontrace/app rev-parse --verify "$APP_REVISION^{commit}" >/dev/null
+test "$(git -C /opt/carbontrace/app rev-parse HEAD)" = "$APP_REVISION"
 chown -R carbontrace:carbontrace /opt/carbontrace/app
 
 runuser -u carbontrace -- python3 -m venv /opt/carbontrace/venv
@@ -63,8 +64,10 @@ metadata() {
 export HOME=/opt/carbontrace
 export XDG_CACHE_HOME=/opt/carbontrace/.cache
 export CARBONTRACE_PROJECT=${jsonencode(project_name)}
+export CARBONTRACE_INSTANCE_ID="$(metadata http://169.254.169.254/latest/meta-data/instance-id)"
 export CARBONTRACE_INSTANCE_TYPE="$(metadata http://169.254.169.254/latest/meta-data/instance-type)"
 export CARBONTRACE_REVISION=${jsonencode(app_revision)}
+export CARBONTRACE_ACTIVE_LEASE_SECONDS=300
 export AWS_REGION="$(metadata http://169.254.169.254/latest/meta-data/placement/region)"
 exec /opt/carbontrace/venv/bin/python -m app.metrics_reporter --publish
 SCRIPT
@@ -81,6 +84,7 @@ Wants=network-online.target
 Type=oneshot
 User=carbontrace
 Group=carbontrace
+TimeoutStartSec=5min
 WorkingDirectory=/opt/carbontrace/app
 ExecStart=/bin/bash -c '/opt/carbontrace/run-reporter.sh >> /var/log/carbontrace/metrics-reporter.log 2>&1'
 NoNewPrivileges=true

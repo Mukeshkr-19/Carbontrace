@@ -124,6 +124,16 @@ variable "instance_type" {
   }
 }
 
+variable "ubuntu_ami_id" {
+  description = "Explicitly reviewed Canonical Ubuntu 22.04 amd64 AMI ID for us-east-1. Update only through reviewed source control."
+  type        = string
+
+  validation {
+    condition     = can(regex("^ami-[0-9a-f]{17}$", var.ubuntu_ami_id))
+    error_message = "ubuntu_ami_id must be a 17-hex-character EC2 AMI ID."
+  }
+}
+
 variable "key_name" {
   description = "Name of an existing EC2 key pair in the selected AWS Region."
   type        = string
@@ -180,5 +190,20 @@ variable "auto_stop_interval_hours" {
   validation {
     condition     = var.auto_stop_interval_hours >= 1 && floor(var.auto_stop_interval_hours) == var.auto_stop_interval_hours
     error_message = "auto_stop_interval_hours must be a whole number of at least 1."
+  }
+}
+
+variable "auto_stop_grace_period_seconds" {
+  description = "Minimum instance runtime after launch or restart before auto-stop may request a stop."
+  type        = number
+  default     = 900
+
+  validation {
+    condition = (
+      var.auto_stop_grace_period_seconds >= 300 &&
+      var.auto_stop_grace_period_seconds <= 3600 &&
+      floor(var.auto_stop_grace_period_seconds) == var.auto_stop_grace_period_seconds
+    )
+    error_message = "auto_stop_grace_period_seconds must be a whole number from 300 through 3600."
   }
 }

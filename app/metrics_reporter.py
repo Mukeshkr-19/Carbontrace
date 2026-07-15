@@ -6,6 +6,7 @@ import argparse
 import json
 import math
 import os
+import re
 import threading
 import time
 import uuid
@@ -39,6 +40,16 @@ CLOUDWATCH_CLIENT_CONFIG = Config(
     read_timeout=5,
     retries={"mode": "standard", "total_max_attempts": 3},
 )
+ACTIVE_WORKLOAD_TAG_KEY = "CarbontraceActiveUntil"
+DEFAULT_ACTIVE_LEASE_SECONDS = 300
+LEASE_CONFIRMATION_TIMEOUT_SECONDS = 5.0
+LEASE_CONFIRMATION_ATTEMPTS = 3
+INSTANCE_ID_PATTERN = re.compile(r"^i-[0-9a-f]{8}(?:[0-9a-f]{9})?$")
+EC2_LEASE_CLIENT_CONFIG = Config(
+    connect_timeout=3,
+    read_timeout=5,
+    retries={"mode": "standard", "total_max_attempts": 3},
+)
 
 
 @dataclass(frozen=True)
@@ -66,6 +77,108 @@ class EstimationMethodology:
     carbon_intensity_source: str
     carbon_intensity_g_co2e_per_kwh: float
     pue: float
+
+
+class ActiveWorkLease:
+    """Short-lived EC2 tag lease preventing auto-stop during a published run."""
+
+    def __init__(
+        self,
+        instance_id: str,
+        region: str,
+        lease_seconds: int = DEFAULT_ACTIVE_LEASE_SECONDS,
+    ) -> None:
+        if not INSTANCE_ID_PATTERN.fullmatch(instance_id):
+            raise ValueError("CARBONTRACE_INSTANCE_ID must be a valid EC2 instance ID.")
+        if isinstance(lease_seconds, bool) or lease_seconds <= 0:
+            raise ValueError("CARBONTRACE_ACTIVE_LEASE_SECONDS must be positive.")
+        self.instance_id = instance_id
+        self.lease_seconds = lease_seconds
+        self.client = boto3.client(
+            "ec2",
+            region_name=region,
+            config=EC2_LEASE_CLIENT_CONFIG,
+        )
+
+    def __enter__(self) -> "ActiveWorkLease":
+        active_until = int(time.time()) + self.lease_seconds
+        expected_value = str(active_until)
+        self.client.create_tags(
+            Resources=[self.instance_id],
+            Tags=[{"Key": ACTIVE_WORKLOAD_TAG_KEY, "Value": expected_value}],
+        )
+        try:
+            self._confirm_visible(expected_value)
+        except Exception:
+            try:
+                self._remove_tag()
+            except Exception:
+                pass
+            raise
+        return self
+
+    def __exit__(self, error_type, error, traceback) -> bool:
+        try:
+            self._remove_tag()
+        except Exception:
+            if error_type is None:
+                raise
+        return False
+
+    def _confirm_visible(self, expected_value: str) -> None:
+        deadline = time.monotonic() + LEASE_CONFIRMATION_TIMEOUT_SECONDS
+        last_error: Exception | None = None
+        for attempt in range(LEASE_CONFIRMATION_ATTEMPTS):
+            try:
+                response = self.client.describe_instances(
+                    InstanceIds=[self.instance_id]
+                )
+                if self._visible_lease_value(response) == expected_value:
+                    return
+            except Exception as error:
+                last_error = error
+
+            if attempt == LEASE_CONFIRMATION_ATTEMPTS - 1:
+                break
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                break
+            time.sleep(min(1.0 * (2**attempt), remaining_seconds))
+
+        error = RuntimeError(
+            "Active workload lease was not visible before the confirmation deadline."
+        )
+        if last_error is not None:
+            raise error from last_error
+        raise error
+
+    def _visible_lease_value(self, response: dict) -> str | None:
+        for reservation in response.get("Reservations", []):
+            for instance in reservation.get("Instances", []):
+                if instance.get("InstanceId") != self.instance_id:
+                    continue
+                tags = {
+                    tag.get("Key"): tag.get("Value")
+                    for tag in instance.get("Tags", [])
+                }
+                return tags.get(ACTIVE_WORKLOAD_TAG_KEY)
+        return None
+
+    def _remove_tag(self) -> None:
+        self.client.delete_tags(
+            Resources=[self.instance_id],
+            Tags=[{"Key": ACTIVE_WORKLOAD_TAG_KEY}],
+        )
+
+
+def active_work_lease(region: str) -> ActiveWorkLease:
+    instance_id = os.environ.get("CARBONTRACE_INSTANCE_ID", "")
+    raw_lease_seconds = os.environ.get(
+        "CARBONTRACE_ACTIVE_LEASE_SECONDS", str(DEFAULT_ACTIVE_LEASE_SECONDS)
+    )
+    if not raw_lease_seconds.isdigit():
+        raise ValueError("CARBONTRACE_ACTIVE_LEASE_SECONDS must be positive.")
+    return ActiveWorkLease(instance_id, region, int(raw_lease_seconds))
 
 
 class ProcessSampler:
@@ -302,8 +415,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
+def _measure_and_report(args: argparse.Namespace) -> None:
     summary = measure_run(args.duration_seconds, args.work_size, args.region)
     print(
         json.dumps(
@@ -339,6 +451,15 @@ def main() -> None:
             ),
             flush=True,
         )
+
+
+def main() -> None:
+    args = parse_args()
+    if args.publish:
+        with active_work_lease(args.region):
+            _measure_and_report(args)
+    else:
+        _measure_and_report(args)
 
 
 if __name__ == "__main__":

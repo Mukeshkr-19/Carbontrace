@@ -36,6 +36,12 @@ jobs:
       - name: Run Python tests
         run: python -m unittest discover -s tests -v
 
+      - name: Run IAM semantic and policy-size regressions
+        run: python -m unittest discover -s tests -p 'test_iam_policies.py' -v
+
+      - name: Run rendered bootstrap and systemd checks
+        run: python -m unittest discover -s tests -p 'test_bootstrap_template.py' -v
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
@@ -46,10 +52,13 @@ jobs:
 
       - name: Initialize and validate bootstrap module
         run: |
-          terraform -chdir=bootstrap init -backend=false -input=false
+          terraform -chdir=bootstrap init -backend=false -input=false -lockfile=readonly
           terraform -chdir=bootstrap validate
 
       - name: Initialize and validate main module
         run: |
-          terraform init -backend=false -input=false
+          terraform init -backend=false -input=false -lockfile=readonly
           terraform validate
+
+      - name: Verify Terraform initialization changed no tracked files
+        run: git diff --exit-code

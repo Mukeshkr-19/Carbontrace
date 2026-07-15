@@ -2,6 +2,17 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ConfirmCarbontraceActiveWorkloadLease",
+      "Effect": "Allow",
+      "Action": "ec2:DescribeInstances",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
       "Sid": "PublishOnlyCarbontraceMetrics",
       "Effect": "Allow",
       "Action": "cloudwatch:PutMetricData",
@@ -12,6 +23,26 @@
             "Carbontrace/App",
             "Carbontrace/Host"
           ]
+        }
+      }
+    },
+    {
+      "Sid": "ManageOnlyCarbontraceActiveWorkloadLease",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
+      "Condition": {
+        "ForAllValues:StringEquals": {
+          "aws:TagKeys": [
+            "CarbontraceActiveUntil"
+          ]
+        },
+        "StringEquals": {
+          "ec2:ResourceTag/Name": "carbontrace-profiler",
+          "ec2:ResourceTag/Project": "Carbontrace"
         }
       }
     },

@@ -38,6 +38,8 @@ aws iam put-role-policy \
   --policy-document file://bootstrap/runtime-roles/lambda-permissions-policy.json
 ```
 
-The EC2 role can publish only the two Carbontrace metric namespaces and write only to the exact application log group. The Lambda role can stop only an instance tagged with both `Project=Carbontrace` and `Name=carbontrace-profiler`, and write only to the exact auto-stop log group.
+The EC2 role can publish only the two Carbontrace metric namespaces, write only to the exact application log group, and create or delete only the `CarbontraceActiveUntil` tag on an instance already tagged with both `Project=Carbontrace` and `Name=carbontrace-profiler`. It has Region-limited, read-only `DescribeInstances` access so the reporter can confirm the exact lease value is visible before beginning work. That expiring tag is the reporter's active-work lease.
+
+The Lambda role has read-only `DescribeInstances` access restricted to `us-east-1`, can stop only an instance tagged with both `Project=Carbontrace` and `Name=carbontrace-profiler`, and writes only to the exact auto-stop log group. `DescribeInstances` requires `Resource: "*"`; it is a read-only EC2 API, Region-conditioned, and the function still requests and accepts only its exact configured instance ID. Neither runtime policy grants `TerminateInstances`.
 
 Do not grant the `carbontrace` deployment user permission to alter these runtime identities.

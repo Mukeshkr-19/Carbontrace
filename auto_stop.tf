@@ -33,7 +33,10 @@ resource "aws_lambda_function" "auto_stop" {
 
   environment {
     variables = {
-      INSTANCE_ID = aws_instance.profiler.id
+      ACTIVE_WORKLOAD_TAG_KEY  = "CarbontraceActiveUntil"
+      INSTANCE_ID              = aws_instance.profiler.id
+      MAX_ACTIVE_LEASE_SECONDS = "600"
+      MIN_RUNTIME_SECONDS      = tostring(var.auto_stop_grace_period_seconds)
     }
   }
 }

@@ -20,7 +20,7 @@ Terraform
    |
    +--> Read pre-existing EC2/Lambda runtime roles (no IAM mutation)
    +--> Default VPC + SSH-only security group
-   +--> EC2 (Ubuntu 22.04, encrypted EBS, IMDSv2 required)
+   +--> EC2 (explicit reviewed Ubuntu 22.04 AMI, encrypted EBS, IMDSv2 required)
    |       |
    |       +--> systemd timer --> Python workload + reporter
    |       |                         |
@@ -30,7 +30,7 @@ Terraform
    |       +--> CloudWatch agent --> host metrics + application log group
    |
    +--> CloudWatch dashboard (Carbontrace/App)
-   +--> EventBridge rule --> Lambda --> stop this EC2 instance
+   +--> EventBridge rule --> Lambda --> state/age/lease checks --> stop this EC2 instance
 ```
 
 ## Metrics and methodology
@@ -113,17 +113,21 @@ After the runtime identities and revised deployment architecture are reviewed, t
 
 ## Deploy
 
+Before the evidence deployment, an administrator must reapply the two reviewed inline runtime-policy documents under `bootstrap/runtime-roles/`. Terraform intentionally cannot modify those roles. This adds the EC2 instance's single-key lease permission and the Lambda's Region-limited `DescribeInstances` permission; review the policy diff before applying it.
+
 1. Create a private local variable file. It is ignored by Git.
 
    ```bash
    cp terraform.tfvars.example terraform.tfvars
    ```
 
-2. Fill in `my_ip` with your current public address followed by `/32`, your existing `key_name`, and a full reviewed commit SHA for `app_revision`. The SHA must exist on the public remote because the instance clones the repository over HTTPS.
+2. Fill in `my_ip` with your current public address followed by `/32`, your existing `key_name`, the reviewed explicit `ubuntu_ami_id`, and a full reviewed commit SHA for `app_revision`. The SHA must exist on the public remote because the instance clones the repository over HTTPS.
 
    ```bash
    git rev-parse HEAD
    ```
+
+   The example pins Canonical Ubuntu 22.04 LTS amd64 release `20260702` in `us-east-1` as `ami-0d28727121d5d4a3c`, sourced from Canonical's public released-image catalog. Future AMI updates require an explicit reviewed source change; Terraform no longer follows `most_recent`.
 
 3. Create a private `backend.hcl` from `backend.hcl.example`, using the S3 bucket created by `bootstrap/`. Keep `use_lockfile = true`.
 
@@ -178,6 +182,8 @@ uv pip compile --python-version 3.10 --generate-hashes --no-header requirements.
 - Direct dependencies are declared in `requirements.in`; the complete transitive environment is hash-locked in `requirements.txt`, installed with `--require-hashes`, and audited in CI.
 - The instance role can publish only the approved CloudWatch namespaces and write only to the project log group.
 - The auto-stop Lambda can stop only the profiler instance, and its execution log group has a 14-day retention policy.
+- The reporter creates the expiring `CarbontraceActiveUntil` tag before a published run, confirms the exact value through bounded `DescribeInstances` retries, and removes it afterward. Measurement cannot begin until confirmation succeeds. Auto-stop reads the exact configured instance twice, refuses to stop non-running or recently launched instances, and honors only a numeric lease no more than 600 seconds into the future.
+- The auto-stop grace period defaults to 900 seconds and is validated to remain between 300 and 3600 seconds. Its boto3 calls use standard retries with three total attempts, a three-second connection timeout, and a five-second read timeout.
 - Terraform state, `.tfvars`, plans, and local virtual environments are excluded from version control. Do not put credentials, private keys, or backend values in tracked files.
 
 ## Cost controls and teardown
@@ -189,24 +195,46 @@ uv pip compile --python-version 3.10 --generate-hashes --no-header requirements.
 - [Free Tier eligibility](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier.html) depends on the account creation date and remaining credits or legacy allowance; it is not a guarantee of zero cost.
 - The instance uses a public IPv4 address for SSH and package downloads. [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/) lists `$0.005` per public IPv4 address-hour when the account's applicable free allowance or credits do not cover it.
 
-When finished, create and review a saved destroy plan, then apply only that plan:
+When finished, create and review a saved destroy plan from the same reviewed configuration and variable inputs used for the evidence deployment. Apply only that saved plan:
 
 ```bash
+export AWS_PROFILE=carbontrace
+export AWS_REGION=us-east-1
+terraform init -backend-config=backend.hcl -lockfile=readonly
+terraform validate
 terraform plan -destroy -out=destroy.tfplan
 terraform show destroy.tfplan
 terraform apply destroy.tfplan
 ```
 
-This destroys the main Carbontrace infrastructure only. It does not destroy the separately bootstrapped state bucket, which is protected by `prevent_destroy = true` and must be retained while any Terraform state depends on it.
+The reviewed destroy plan must remove all Terraform-managed main-stack components:
 
-Then verify that the instance is gone:
+- the EC2 instance, encrypted root EBS volume, primary network interface, and security group;
+- the application and Lambda CloudWatch log groups;
+- the Lambda function and its EventBridge invoke permission;
+- the EventBridge rule and target;
+- the auto-stop error alarm; and
+- the Carbontrace dashboard.
+
+Run the read-only orphan verifier after the saved destroy plan completes:
 
 ```bash
-aws ec2 describe-instances \
-  --filters "Name=tag:Project,Values=Carbontrace" \
-  --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name}' \
-  --output table
+AWS_PROFILE=carbontrace AWS_REGION=us-east-1 \
+  .venv/bin/python scripts/verify_post_destroy.py
 ```
+
+The verifier uses only describe/get/list operations, prints no credentials or Terraform state, and exits nonzero if a main-stack resource remains. It checks EC2 instances, EBS volumes, network interfaces, security groups, both log groups, the Lambda function and permission, EventBridge rule and target, alarm, and dashboard.
+
+The following setup resources intentionally remain outside the main stack and are reported separately:
+
+- the versioned Terraform backend bucket and its retained object versions;
+- the administrator-managed EC2 and Lambda runtime roles;
+- the `carbontrace-ec2-profile` instance profile;
+- the deployment user and its backend/deployment policies;
+- the existing EC2 key pair; and
+- the operator's local PEM file.
+
+Do not treat those retained setup resources as destroy failures. Remove them only through a separate, explicitly reviewed administrative cleanup after confirming no state or deployment depends on them.
 
 ## Future direction
 

@@ -3,9 +3,14 @@
 my_ip = "REPLACE_WITH_YOUR_PUBLIC_IPV4/32"
 key_name = "your-existing-ec2-key-pair"
 
+# Canonical Ubuntu 22.04 LTS amd64, us-east-1, released image 20260702.
+# Review Canonical's released-image catalog before deliberately changing this value.
+ubuntu_ami_id = "ami-0d28727121d5d4a3c"
+
 # Use the full commit SHA of a reviewed repository revision, not a branch name.
 app_revision = "replace-with-a-40-character-commit-sha"
 
 # The auto-stop rule is a periodic cost circuit breaker; terraform destroy is still required for full cleanup.
-auto_stop_enabled        = true
-auto_stop_interval_hours = 1
+auto_stop_enabled              = true
+auto_stop_interval_hours       = 1
+auto_stop_grace_period_seconds = 900

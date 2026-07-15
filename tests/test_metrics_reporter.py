@@ -9,10 +9,12 @@ from unittest.mock import patch
 
 from app.drain_app import WorkloadSummary
 from app.metrics_reporter import (
+    ACTIVE_WORKLOAD_TAG_KEY,
     CARBON_METHODOLOGY,
     CODECARBON_VERSION,
     PUE,
     TRACKING_MODE,
+    ActiveWorkLease,
     EstimationMethodology,
     ResourceSummary,
     RunSummary,
@@ -48,7 +50,133 @@ def make_summary(**overrides) -> RunSummary:
     return replace(summary, **overrides)
 
 
+def lease_response(value: str | None) -> dict:
+    tags = [] if value is None else [{"Key": ACTIVE_WORKLOAD_TAG_KEY, "Value": value}]
+    return {
+        "Reservations": [
+            {
+                "Instances": [
+                    {
+                        "InstanceId": "i-0123456789abcdef0",
+                        "Tags": tags,
+                    }
+                ]
+            }
+        ]
+    }
+
+
 class MetricsReporterTests(unittest.TestCase):
+    def test_active_work_lease_visible_immediately_permits_execution(self) -> None:
+        with (
+            patch("app.metrics_reporter.time.time", return_value=1_700_000_000),
+            patch("app.metrics_reporter.time.monotonic", return_value=100.0),
+            patch("app.metrics_reporter.time.sleep") as mock_sleep,
+            patch("app.metrics_reporter.boto3.client") as mock_client,
+        ):
+            mock_client.return_value.describe_instances.return_value = lease_response(
+                "1700000300"
+            )
+            with ActiveWorkLease("i-0123456789abcdef0", "us-east-1", 300):
+                mock_client.return_value.create_tags.assert_called_once_with(
+                    Resources=["i-0123456789abcdef0"],
+                    Tags=[
+                        {
+                            "Key": ACTIVE_WORKLOAD_TAG_KEY,
+                            "Value": "1700000300",
+                        }
+                    ],
+                )
+
+            mock_client.return_value.describe_instances.assert_called_once_with(
+                InstanceIds=["i-0123456789abcdef0"]
+            )
+            mock_sleep.assert_not_called()
+
+        mock_client.return_value.delete_tags.assert_called_once_with(
+            Resources=["i-0123456789abcdef0"],
+            Tags=[{"Key": ACTIVE_WORKLOAD_TAG_KEY}],
+        )
+        _, client_kwargs = mock_client.call_args
+        self.assertEqual(client_kwargs["region_name"], "us-east-1")
+        config = client_kwargs["config"]
+        self.assertEqual(config.connect_timeout, 3)
+        self.assertEqual(config.read_timeout, 5)
+        self.assertEqual(config.retries["mode"], "standard")
+        self.assertEqual(config.retries["total_max_attempts"], 3)
+
+    def test_active_work_lease_eventual_visibility_succeeds(self) -> None:
+        with (
+            patch("app.metrics_reporter.time.time", return_value=1_700_000_000),
+            patch("app.metrics_reporter.time.monotonic", return_value=100.0),
+            patch("app.metrics_reporter.time.sleep") as mock_sleep,
+            patch("app.metrics_reporter.boto3.client") as mock_client,
+        ):
+            mock_client.return_value.describe_instances.side_effect = [
+                lease_response(None),
+                lease_response("stale"),
+                lease_response("1700000300"),
+            ]
+            with ActiveWorkLease("i-0123456789abcdef0", "us-east-1", 300):
+                pass
+
+        self.assertEqual(mock_client.return_value.describe_instances.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    def test_active_work_lease_never_visible_raises_and_attempts_cleanup(self) -> None:
+        with (
+            patch("app.metrics_reporter.time.time", return_value=1_700_000_000),
+            patch("app.metrics_reporter.time.monotonic", return_value=100.0),
+            patch("app.metrics_reporter.time.sleep"),
+            patch("app.metrics_reporter.boto3.client") as mock_client,
+        ):
+            mock_client.return_value.describe_instances.return_value = lease_response(None)
+            with self.assertRaisesRegex(RuntimeError, "lease was not visible"):
+                with ActiveWorkLease("i-0123456789abcdef0", "us-east-1", 300):
+                    self.fail("Execution entered an unconfirmed lease context.")
+
+        self.assertEqual(mock_client.return_value.describe_instances.call_count, 3)
+        mock_client.return_value.delete_tags.assert_called_once_with(
+            Resources=["i-0123456789abcdef0"],
+            Tags=[{"Key": ACTIVE_WORKLOAD_TAG_KEY}],
+        )
+
+    @patch("app.metrics_reporter.publish_metrics")
+    @patch("app.metrics_reporter.measure_run")
+    @patch("app.metrics_reporter.parse_args")
+    def test_visibility_failure_prevents_measurement_workload_and_publication(
+        self, mock_parse_args, mock_measure_run, mock_publish_metrics
+    ) -> None:
+        mock_parse_args.return_value = argparse.Namespace(
+            duration_seconds=30,
+            work_size=100,
+            project_name="Carbontrace",
+            instance_type="t3.micro",
+            region="us-east-1",
+            publish=True,
+        )
+        environment = {
+            "CARBONTRACE_INSTANCE_ID": "i-0123456789abcdef0",
+            "CARBONTRACE_ACTIVE_LEASE_SECONDS": "300",
+        }
+        with (
+            patch.dict("app.metrics_reporter.os.environ", environment, clear=False),
+            patch("app.metrics_reporter.time.time", return_value=1_700_000_000),
+            patch("app.metrics_reporter.time.monotonic", return_value=100.0),
+            patch("app.metrics_reporter.time.sleep"),
+            patch("app.metrics_reporter.boto3.client") as mock_client,
+        ):
+            mock_client.return_value.describe_instances.return_value = lease_response(None)
+            with self.assertRaisesRegex(RuntimeError, "lease was not visible"):
+                main()
+
+        mock_measure_run.assert_not_called()
+        mock_publish_metrics.assert_not_called()
+        mock_client.return_value.delete_tags.assert_called_once_with(
+            Resources=["i-0123456789abcdef0"],
+            Tags=[{"Key": ACTIVE_WORKLOAD_TAG_KEY}],
+        )
+
     @patch("app.metrics_reporter.boto3.client")
     def test_publish_uses_exact_metric_contract_and_bounded_client(self, mock_client) -> None:
         summary = make_summary()
@@ -172,8 +300,9 @@ class MetricsReporterTests(unittest.TestCase):
     @patch("app.metrics_reporter.publish_metrics")
     @patch("app.metrics_reporter.measure_run")
     @patch("app.metrics_reporter.parse_args")
+    @patch("app.metrics_reporter.active_work_lease")
     def test_main_logs_publish_success_only_after_publish_returns(
-        self, mock_parse_args, mock_measure_run, mock_publish_metrics
+        self, mock_lease, mock_parse_args, mock_measure_run, mock_publish_metrics
     ) -> None:
         mock_parse_args.return_value = argparse.Namespace(
             duration_seconds=30,
@@ -190,6 +319,7 @@ class MetricsReporterTests(unittest.TestCase):
             main()
 
         mock_publish_metrics.assert_called_once()
+        mock_lease.assert_called_once_with("us-east-1")
         records = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual(
             [record["event"] for record in records],
@@ -199,8 +329,9 @@ class MetricsReporterTests(unittest.TestCase):
     @patch("app.metrics_reporter.publish_metrics")
     @patch("app.metrics_reporter.measure_run")
     @patch("app.metrics_reporter.parse_args")
+    @patch("app.metrics_reporter.active_work_lease")
     def test_main_logs_publish_failure_and_reraises(
-        self, mock_parse_args, mock_measure_run, mock_publish_metrics
+        self, mock_lease, mock_parse_args, mock_measure_run, mock_publish_metrics
     ) -> None:
         mock_parse_args.return_value = argparse.Namespace(
             duration_seconds=30,
