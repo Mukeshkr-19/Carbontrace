@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).parents[1]
-ACCOUNT_ID = "562325340670"
+ACCOUNT_ID = "<AWS_ACCOUNT_ID>"
 REGION = "us-east-1"
 DEPLOYMENT_POLICY_PATH = ROOT / "bootstrap" / "main-deployment-policy.json"
 

@@ -1,1 +1,2 @@
+aws_account_id    = "REPLACE_WITH_YOUR_12_DIGIT_AWS_ACCOUNT_ID"
 state_bucket_name = "replace-with-a-globally-unique-bucket-name"

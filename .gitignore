@@ -3,6 +3,10 @@
 *.tfstate
 *.tfstate.*
 *.tfplan
+*.plan.txt
+*.apply.txt
+*.destroy.txt
+*.deployment.txt
 backend.hcl
 *.tfvars
 !*.tfvars.example
@@ -23,7 +27,15 @@ __pycache__/
 .env.*
 *.pem
 *.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
 .aws/
+
+# Local evidence, review, and audit artifacts
+evidence/
+audit-output/
 
 # Private learning material — intentionally never committed
 .learning/

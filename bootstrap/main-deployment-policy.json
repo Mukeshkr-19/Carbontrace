@@ -43,8 +43,8 @@
         "iam:ListRoleTags"
       ],
       "Resource": [
-        "arn:aws:iam::562325340670:role/carbontrace-ec2-role",
-        "arn:aws:iam::562325340670:role/carbontrace-auto-stop-role"
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/carbontrace-ec2-role",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/carbontrace-auto-stop-role"
       ]
     },
     {
@@ -53,14 +53,14 @@
         "iam:GetInstanceProfile",
         "iam:ListInstanceProfileTags"
       ],
-      "Resource": "arn:aws:iam::562325340670:instance-profile/carbontrace-ec2-profile"
+      "Resource": "arn:aws:iam::<AWS_ACCOUNT_ID>:instance-profile/carbontrace-ec2-profile"
     },
     {
       "Effect": "Allow",
       "Action": [
         "ec2:RunInstances"
       ],
-      "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
+      "Resource": "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:instance/*",
       "Condition": {
         "StringEquals": {
           "aws:RequestTag/Project": "Carbontrace",
@@ -75,11 +75,11 @@
       ],
       "Resource": [
         "arn:aws:ec2:us-east-1::image/*",
-        "arn:aws:ec2:us-east-1:562325340670:key-pair/*",
-        "arn:aws:ec2:us-east-1:562325340670:network-interface/*",
-        "arn:aws:ec2:us-east-1:562325340670:security-group/*",
-        "arn:aws:ec2:us-east-1:562325340670:subnet/*",
-        "arn:aws:ec2:us-east-1:562325340670:volume/*"
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:key-pair/*",
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:network-interface/*",
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:security-group/*",
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:subnet/*",
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:volume/*"
       ]
     },
     {
@@ -88,7 +88,7 @@
         "ec2:CreateSecurityGroup"
       ],
       "Resource": [
-        "arn:aws:ec2:us-east-1:562325340670:security-group/*"
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:security-group/*"
       ],
       "Condition": {
         "StringEquals": {
@@ -102,7 +102,7 @@
         "ec2:CreateSecurityGroup"
       ],
       "Resource": [
-        "arn:aws:ec2:us-east-1:562325340670:vpc/*"
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:vpc/*"
       ]
     },
     {
@@ -114,7 +114,7 @@
         "ec2:RevokeSecurityGroupEgress",
         "ec2:RevokeSecurityGroupIngress"
       ],
-      "Resource": "arn:aws:ec2:us-east-1:562325340670:security-group/*",
+      "Resource": "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:security-group/*",
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/Project": "Carbontrace"
@@ -127,7 +127,7 @@
         "ec2:StopInstances",
         "ec2:TerminateInstances"
       ],
-      "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
+      "Resource": "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:instance/*",
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/Project": "Carbontrace"
@@ -140,9 +140,9 @@
         "ec2:CreateTags"
       ],
       "Resource": [
-        "arn:aws:ec2:us-east-1:562325340670:instance/*",
-        "arn:aws:ec2:us-east-1:562325340670:security-group/*",
-        "arn:aws:ec2:us-east-1:562325340670:volume/*"
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:instance/*",
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:security-group/*",
+        "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:volume/*"
       ],
       "Condition": {
         "ForAllValues:StringEquals": {
@@ -166,7 +166,7 @@
       "Action": [
         "iam:PassRole"
       ],
-      "Resource": "arn:aws:iam::562325340670:role/carbontrace-ec2-role",
+      "Resource": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/carbontrace-ec2-role",
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "ec2.amazonaws.com"
@@ -178,7 +178,7 @@
       "Action": [
         "iam:PassRole"
       ],
-      "Resource": "arn:aws:iam::562325340670:role/carbontrace-auto-stop-role",
+      "Resource": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/carbontrace-auto-stop-role",
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "lambda.amazonaws.com"
@@ -193,10 +193,10 @@
         "logs:PutRetentionPolicy"
       ],
       "Resource": [
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace:*",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop:*"
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/carbontrace/carbontrace",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/carbontrace/carbontrace:*",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/lambda/carbontrace-auto-stop",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/lambda/carbontrace-auto-stop:*"
       ]
     },
     {
@@ -206,8 +206,8 @@
         "logs:UntagResource"
       ],
       "Resource": [
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop"
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/carbontrace/carbontrace",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/lambda/carbontrace-auto-stop"
       ]
     },
     {
@@ -216,10 +216,10 @@
         "logs:TagResource"
       ],
       "Resource": [
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/carbontrace/carbontrace:*",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop",
-        "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop:*"
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/carbontrace/carbontrace",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/carbontrace/carbontrace:*",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/lambda/carbontrace-auto-stop",
+        "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/lambda/carbontrace-auto-stop:*"
       ]
     },
     {
@@ -232,7 +232,7 @@
         "cloudwatch:TagResource",
         "cloudwatch:UntagResource"
       ],
-      "Resource": "arn:aws:cloudwatch::562325340670:dashboard/carbontrace-dashboard"
+      "Resource": "arn:aws:cloudwatch::<AWS_ACCOUNT_ID>:dashboard/carbontrace-dashboard"
     },
     {
       "Effect": "Allow",
@@ -252,7 +252,7 @@
         "lambda:UpdateFunctionCode",
         "lambda:UpdateFunctionConfiguration"
       ],
-      "Resource": "arn:aws:lambda:us-east-1:562325340670:function:carbontrace-auto-stop"
+      "Resource": "arn:aws:lambda:us-east-1:<AWS_ACCOUNT_ID>:function:carbontrace-auto-stop"
     },
     {
       "Effect": "Allow",
@@ -264,7 +264,7 @@
         "cloudwatch:TagResource",
         "cloudwatch:UntagResource"
       ],
-      "Resource": "arn:aws:cloudwatch:us-east-1:562325340670:alarm:carbontrace-auto-stop-errors"
+      "Resource": "arn:aws:cloudwatch:us-east-1:<AWS_ACCOUNT_ID>:alarm:carbontrace-auto-stop-errors"
     },
     {
       "Effect": "Allow",
@@ -279,7 +279,7 @@
         "events:TagResource",
         "events:UntagResource"
       ],
-      "Resource": "arn:aws:events:us-east-1:562325340670:rule/carbontrace-auto-stop"
+      "Resource": "arn:aws:events:us-east-1:<AWS_ACCOUNT_ID>:rule/carbontrace-auto-stop"
     }
   ]
 }

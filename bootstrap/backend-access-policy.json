@@ -8,7 +8,7 @@
         "s3:GetBucketLocation",
         "s3:ListBucket"
       ],
-      "Resource": "arn:aws:s3:::carbontrace-tf-562325340670"
+      "Resource": "arn:aws:s3:::carbontrace-tf-<AWS_ACCOUNT_ID>"
     },
     {
       "Sid": "ReadWriteCarbontraceTerraformState",
@@ -17,7 +17,7 @@
         "s3:GetObject",
         "s3:PutObject"
       ],
-      "Resource": "arn:aws:s3:::carbontrace-tf-562325340670/carbontrace/terraform.tfstate"
+      "Resource": "arn:aws:s3:::carbontrace-tf-<AWS_ACCOUNT_ID>/carbontrace/terraform.tfstate"
     },
     {
       "Sid": "ManageCarbontraceTerraformLockfile",
@@ -27,7 +27,7 @@
         "s3:PutObject",
         "s3:DeleteObject"
       ],
-      "Resource": "arn:aws:s3:::carbontrace-tf-562325340670/carbontrace/terraform.tfstate.tflock"
+      "Resource": "arn:aws:s3:::carbontrace-tf-<AWS_ACCOUNT_ID>/carbontrace/terraform.tfstate.tflock"
     }
   ]
 }

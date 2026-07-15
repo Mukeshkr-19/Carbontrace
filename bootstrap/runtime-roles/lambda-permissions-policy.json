@@ -16,7 +16,7 @@
       "Sid": "StopOnlyTaggedCarbontraceInstances",
       "Effect": "Allow",
       "Action": "ec2:StopInstances",
-      "Resource": "arn:aws:ec2:us-east-1:562325340670:instance/*",
+      "Resource": "arn:aws:ec2:us-east-1:<AWS_ACCOUNT_ID>:instance/*",
       "Condition": {
         "StringEquals": {
           "ec2:ResourceTag/Name": "carbontrace-profiler",
@@ -31,7 +31,7 @@
         "logs:CreateLogStream",
         "logs:PutLogEvents"
       ],
-      "Resource": "arn:aws:logs:us-east-1:562325340670:log-group:/aws/lambda/carbontrace-auto-stop:*"
+      "Resource": "arn:aws:logs:us-east-1:<AWS_ACCOUNT_ID>:log-group:/aws/lambda/carbontrace-auto-stop:*"
     }
   ]
 }
