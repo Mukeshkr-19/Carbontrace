@@ -2,7 +2,7 @@
 
 These IAM resources are an administrator-created prerequisite. The Terraform deployment user may read and pass them but cannot create, edit, attach, or delete IAM roles, policies, or instance profiles.
 
-Before running the commands below, authenticate an administrator session for account `562325340670` and verify that the active identity is not the `carbontrace` deployment user. Run the commands from the repository root.
+Before running the commands below, replace every `<AWS_ACCOUNT_ID>` placeholder in the reviewed policy templates with the target 12-digit account ID, authenticate an administrator session for that account, and verify that the active identity is not the `carbontrace` deployment user. Run the commands from the repository root.
 
 ```bash
 aws sts get-caller-identity

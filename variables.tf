@@ -12,7 +12,6 @@ variable "aws_region" {
 variable "aws_account_id" {
   description = "AWS account ID allowed for this deployment."
   type        = string
-  default     = "562325340670"
 
   validation {
     condition     = can(regex("^[0-9]{12}$", var.aws_account_id))

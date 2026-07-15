@@ -1,5 +1,6 @@
 # Copy this file to terraform.tfvars and replace the example value.
 # terraform.tfvars is ignored by Git because it can contain environment-specific values.
+aws_account_id = "REPLACE_WITH_YOUR_12_DIGIT_AWS_ACCOUNT_ID"
 my_ip = "REPLACE_WITH_YOUR_PUBLIC_IPV4/32"
 key_name = "your-existing-ec2-key-pair"
 
