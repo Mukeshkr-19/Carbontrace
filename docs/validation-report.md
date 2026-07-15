@@ -307,7 +307,7 @@ Local release-preparation results:
 | `pip check` | no broken requirements |
 | `pip-audit 2.10.1 -r requirements.txt` | no known vulnerabilities reported |
 | `git diff --check` | passed |
-| publication pattern scan | no access keys, private-key blocks, AWS credential assignments, Sanjay-specific account ID, tool-specific metadata, or tracked private artifacts found |
+| publication pattern scan | no access keys, private-key blocks, AWS credential assignments, Sanjay-specific account ID, unrelated local artifacts, or tracked private files found |
 
 The project does not declare `pytest`; its supported command is `.venv/bin/python -m unittest discover -s tests -v`, the 51-test discovery command used by CI. The starting CI workflow has no dedicated secret-scanning action, so release preparation used explicit current-tree credential, private-key, identifier, metadata, and forbidden-artifact scans. Remote CI must still run after a human-approved push.
 

@@ -1,242 +1,233 @@
-# Carbontrace — AWS Carbon-Footprint Profiler
+# Carbontrace
 
-> **Project status:** The implementation at Git revision `1cb74aa057ea36b9715f50ada168a9d2e3a91aa9` was deployed and validated in `us-east-1`. Four real workload runs published successfully, the natural hourly auto-stop stopped the profiler, and the Terraform-managed main stack was then intentionally destroyed. The protected backend and administrator-managed prerequisites were retained by design.
+[![Carbontrace CI](https://github.com/Mukeshkr-19/Carbontrace/actions/workflows/ci.yml/badge.svg)](https://github.com/Mukeshkr-19/Carbontrace/actions/workflows/ci.yml)
 
-Carbontrace is a reproducible AWS instrumentation proof of concept. It runs a deliberately inefficient Python workload on one EC2 `t3.micro`, measures process CPU and memory behavior, uses CodeCarbon to **model** energy and CO2e, and publishes five custom metrics plus structured logs to CloudWatch. It demonstrates infrastructure as code, least-privilege IAM boundaries, safe automation, scientific honesty, and verified cleanup.
+Carbontrace is a secure, Terraform-managed AWS workload profiler that observes process CPU and memory usage, derives modeled energy and carbon estimates with CodeCarbon, publishes telemetry to CloudWatch, and automatically stops its EC2 profiler when no validated workload lease is active.
 
-It is not a physical power meter or a general carbon-accounting product. See the [sanitized final validation report](docs/final-validation-report.md) for the evidence-backed results and limitations.
+**Status:** Implementation and AWS runtime validation completed successfully. The temporary Terraform-managed main stack was intentionally destroyed after evidence collection; the protected state backend and administrator-managed prerequisites were retained by design.
 
-## What Carbontrace demonstrates
+## Why Carbontrace
 
-- Terraform-managed EC2, CloudWatch, EventBridge, and Lambda application infrastructure
-- administrator-created runtime identities separated from the deployment identity
-- a pinned Canonical Ubuntu AMI validated through an exact-ID, Canonical-owner lookup
-- encrypted 8 GiB `gp3` root storage and IMDSv2 with hop limit 1
-- an unprivileged `carbontrace` application user and `cwagent` CloudWatch Agent user
-- a hardened, bounded `systemd` service and timer
-- process-scoped CPU and memory sampling
-- CodeCarbon 3.2.8 offline energy and CO2e estimation
-- lease-aware exact-instance auto-stop with bounded lease values
-- saved-plan deployment and teardown discipline
-- a read-only post-destroy orphan verifier
-- 51 automated regression tests
+Cloud workloads expose CPU and memory telemetry, but they do not normally expose direct hardware power readings. Carbontrace explores how to build an honest, reproducible bridge between workload behavior and estimated energy or carbon impact without presenting modeled values as physical measurements.
+
+The project brings together:
+
+- Terraform infrastructure and remote-state design
+- AWS IAM least privilege and deployment/runtime identity separation
+- EC2 bootstrap, immutable source revisions, and hardened `systemd` execution
+- Python process instrumentation with psutil
+- CodeCarbon energy and CO2e estimation
+- CloudWatch custom metrics, logs, dashboards, and alarms
+- EventBridge and Lambda operational safety automation
+- evidence-driven deployment validation and teardown verification
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    TF["Terraform"] --> EC2["EC2 t3.micro<br/>pinned Ubuntu AMI<br/>encrypted 8 GiB gp3<br/>IMDSv2 required"]
-    TF --> CW["CloudWatch<br/>five metrics + logs + dashboard + alarm"]
-    TF --> EB["EventBridge<br/>rate(1 hour)"]
-    TF --> L["Lambda auto-stop"]
-    TF -. "state and lock" .-> S3["Protected S3 backend<br/>retained after main-stack teardown"]
+    TF["Terraform"] --> EC2["EC2 profiler<br/>t3.micro"]
+    TF --> CW["CloudWatch"]
+    TF --> EB["EventBridge<br/>hourly schedule"]
+    TF --> LAMBDA["Auto-stop Lambda"]
+    TF -. "state and lock" .-> BACKEND["Protected S3 backend<br/>retained separately"]
 
-    EC2 --> TIMER["systemd timer<br/>carbontrace user"]
-    TIMER --> REPORTER["Python reporter + workload<br/>psutil process sampling"]
-    REPORTER --> CC["CodeCarbon 3.2.8 offline model<br/>Virginia, USA; PUE 1.0"]
-    REPORTER -->|"PutMetricData"| CW
-    EC2 -->|"application logs via cwagent"| CW
+    subgraph PROFILER["Profiler instance"]
+        EC2 --> TIMER["systemd timer"]
+        TIMER --> REPORTER["Carbontrace reporter<br/>unprivileged user"]
+        REPORTER --> PSUTIL["psutil<br/>CPU and memory observations"]
+        REPORTER --> CODECARBON["CodeCarbon<br/>modeled energy and CO2e"]
+        REPORTER --> LEASE["CarbontraceActiveUntil<br/>confirmed activity lease"]
+        REPORTER --> AGENT["CloudWatch Agent<br/>cwagent user"]
+    end
 
-    REPORTER -->|"create, confirm, remove<br/>CarbontraceActiveUntil"| LEASE["EC2 activity lease"]
-    EB --> L
-    L -->|"state + age + bounded lease<br/>checked twice"| EC2
-    LEASE -. "prevents stop while valid" .-> L
+    PSUTIL --> METRICS["Five custom metrics"]
+    CODECARBON --> METRICS
+    METRICS --> CW
+    AGENT --> LOGS["Application logs"]
+    LOGS --> CW
+    CW --> DASHBOARD["Five-widget dashboard"]
+    CW --> ALARM["Lambda error alarm"]
+
+    EB --> LAMBDA
+    LAMBDA --> CHECKS["Exact instance<br/>state + age + lease checks"]
+    CHECKS -->|"StopInstances when safe"| EC2
+    LEASE -. "valid lease prevents stop" .-> CHECKS
 ```
 
-Terraform read the pre-existing EC2 role, Lambda role, and instance profile as data sources. It did not create or mutate runtime IAM identities. Public IAM documents use `<AWS_ACCOUNT_ID>`; operators must replace that placeholder locally before administrative use.
+Terraform managed the temporary EC2, CloudWatch, EventBridge, and Lambda resources. It read pre-existing runtime roles and the EC2 instance profile rather than creating or modifying those identities. The protected backend remained outside the temporary main-stack teardown.
 
-## Measurements and modeled estimates
+## What It Measures and Estimates
 
-The distinction is deliberate:
+| Metric | Type | CloudWatch unit | Meaning |
+|---|---|---|---|
+| `CPUUtilizationCustom` | Process observation | `Percent` | Average sampled process CPU utilization |
+| `MemoryUtilizationPercent` | Process observation | `Percent` | Average sampled process memory utilization |
+| `EstimatedWatts` | Modeled estimate | `None` | Average modeled power derived from estimated energy and duration |
+| `EstimatedEnergyWh` | Modeled estimate | `None` | CodeCarbon energy estimate converted to watt-hours |
+| `EstimatedCO2Grams` | Modeled estimate | `None` | CodeCarbon CO2e estimate converted to grams |
 
-| Output | Classification | Meaning |
-|---|---|---|
-| `CPUUtilizationCustom` | Measured | Average process CPU accounting over sampled intervals |
-| `MemoryUtilizationPercent` | Measured | Average process memory percentage over sampled intervals |
-| `EstimatedEnergyWh` | Modeled estimate | CodeCarbon energy estimate converted from kWh to Wh |
-| `EstimatedWatts` | Derived modeled estimate | Modeled Wh divided by elapsed hours |
-| `EstimatedCO2Grams` | Modeled estimate | CodeCarbon CO2e estimate converted from kg to grams |
+CPU and memory are operating-system process observations. Energy, watts, and CO2e are CodeCarbon-based modeled estimates—not hardware power-meter, wall-power, or direct electrical measurements.
 
-The energy, watts, and CO2e values are **not hardware energy measurements, wall-power readings, or direct electrical measurements**. CPU values can slightly exceed 100% because process CPU accounting can represent execution across logical CPU time; Carbontrace preserves those observations instead of clamping them.
+Process CPU accounting can slightly exceed 100% when execution spans logical-processor time. Carbontrace preserves those observations rather than silently clamping them.
 
-All five metrics use the stable dimensions `Project`, `InstanceType`, and `WorkloadVersion`. `RunId` and the deployed Git revision remain in structured logs to avoid high-cardinality metric dimensions.
+Every metric uses the stable dimensions `Project`, `InstanceType`, and `WorkloadVersion`. Run IDs and immutable source revisions stay in structured logs to avoid high-cardinality metric dimensions.
 
-| Metric | CloudWatch unit |
+## Key Engineering Features
+
+### Infrastructure and identity
+
+- one Terraform-managed EC2 `t3.micro` in `us-east-1`
+- exact-ID Ubuntu AMI lookup restricted to Canonical owner `099720109477`
+- encrypted 8 GiB `gp3` root volume
+- IMDSv2 required with response hop limit 1
+- SSH ingress restricted to one operator-supplied public IPv4 `/32`, stored only in ignored local configuration
+- protected S3 backend with native lockfile support
+- deployment identity separated from administrator-managed runtime identities
+- public IAM templates use `<AWS_ACCOUNT_ID>`; private deployment values remain untracked
+
+### Runtime hardening
+
+- application runs as the unprivileged `carbontrace` user
+- CloudWatch Agent runs separately as `cwagent`
+- immutable Git revision verified after checkout
+- hash-locked Python dependencies
+- hardened `systemd` oneshot service and recurring timer
+- bounded AWS retries, connection timeouts, and read timeouts
+- structured `measurement_complete`, `publish_success`, and `publish_failure` events
+
+### Operational safety
+
+- Lambda receives and evaluates one exact EC2 instance ID
+- instance state and launch age are checked before stop
+- the lease is evaluated twice to reduce race risk
+- active leases are bounded to a 600-second maximum horizon
+- malformed or excessively future-dated leases cannot suppress shutdown indefinitely
+- the natural hourly schedule stops rather than terminates the instance
+- a read-only verifier checks for main-stack resources after teardown
+
+### Scientific transparency
+
+- CodeCarbon 3.2.8 offline estimator
+- process-scoped tracking
+- AWS `us-east-1` deployment metadata
+- Virginia, USA bundled electricity-mix model
+- effective modeled intensity recorded with every run
+- explicit PUE 1.0, excluding unverified facility overhead
+- unsupported AWS Regions fail closed until their methodology is reviewed
+
+## Validation Results
+
+| Validation | Result |
 |---|---|
-| `CPUUtilizationCustom` | `Percent` |
-| `MemoryUtilizationPercent` | `Percent` |
-| `EstimatedWatts` | `None` |
-| `EstimatedEnergyWh` | `None` |
-| `EstimatedCO2Grams` | `None` |
+| Automated regression suite | 51 tests passed |
+| Real workload publications | 4 successful runs |
+| Publication failures | 0 |
+| Custom CloudWatch metrics | 5, each with datapoints |
+| Dashboard | 5 validated widgets |
+| EventBridge | Enabled hourly rule with 1 Lambda target |
+| Natural auto-stop | Correct EC2 instance stopped after safety checks |
+| Terraform teardown | Exactly 10 managed resources destroyed |
+| Terraform state after teardown | 0 managed resources |
+| Post-destroy verification | No main-stack resources remained |
 
-CloudWatch has no supported Watts, watt-hours, or grams unit. The modeled metrics therefore use `None`, with semantics carried by their names and dashboard labels.
+The scheduled EventBridge invocation—not a manual Lambda invocation—produced a structured `decision: stop_requested` result, and the exact profiler instance was subsequently confirmed stopped.
 
-### CodeCarbon configuration
+See the [final validation report](docs/validation-report.md) for evidence methodology, run data, final SHA-256 values, teardown details, and limitations.
 
-Every structured run recorded:
+## Auto-Stop Safety Design
 
-- estimator: CodeCarbon
-- estimator version: 3.2.8
-- tracking mode: `process`
-- deployment provider and Region: AWS, `us-east-1`
-- offline carbon model: Virginia, USA
-- intensity source: CodeCarbon's bundled US-state electricity mix
-- effective modeled carbon intensity: 369.13437789074 g CO2e/kWh
-- PUE: 1.0
+1. The reporter creates `CarbontraceActiveUntil` on the exact profiler instance.
+2. It confirms the exact tag value through bounded `DescribeInstances` retries.
+3. Measurement and workload execution begin only after visibility is confirmed.
+4. The reporter removes the lease after the run.
+5. EventBridge invokes the auto-stop Lambda hourly.
+6. Lambda validates the configured instance ID, running state, launch age, and bounded lease.
+7. Lambda repeats the state and lease check immediately before requesting `StopInstances`.
+8. The instance is stopped only when no valid active workload lease protects it.
 
-Only `us-east-1` has a reviewed Carbontrace mapping. Unsupported deployment Regions fail closed. PUE 1.0 excludes unverified facility overhead instead of inventing an AWS data-center value. See the [CodeCarbon tracker API](https://docs.codecarbon.io/latest/reference/api/) and [methodology](https://docs.codecarbon.io/3.2/explanation/methodology/).
+If lease confirmation fails, the reporter attempts cleanup and does not start measurement, workload execution, or metric publication.
 
-## Verified final results
+## Repository Layout
 
-The evidence deployment used the immutable revision `1cb74aa057ea36b9715f50ada168a9d2e3a91aa9`.
-
-- cloud-init completed successfully
-- the deployed revision matched the expected SHA
-- the reporter timer was enabled and active
-- the reporter ran as `carbontrace`
-- the CloudWatch Agent ran as `cwagent`
-- four real runs emitted `measurement_complete`
-- four complete five-metric batches emitted `publish_success`
-- zero `publish_failure` events were present
-- no credential or private-key patterns were detected in the reviewed runtime logs
-- activity leases were created, confirmed through `DescribeInstances`, and removed
-- every metric had at least three one-minute datapoints
-- the dashboard contained exactly five widgets using `Average` and a 300-second period
-- EventBridge was enabled at `rate(1 hour)` with exactly one Lambda target
-
-The natural scheduled Lambda invocation—not a manual invocation—recorded this sanitized decision:
-
-```json
-{
-  "age_seconds": 1270,
-  "decision": "stop_requested",
-  "previous_state": "running"
-}
+```text
+Carbontrace/
+├── app/                         # Workload and metrics reporter
+├── bootstrap/                   # Backend module and administrator-reviewed IAM templates
+├── docs/
+│   ├── README.md                # Documentation index
+│   ├── product-requirements.md  # Requirements, decisions, and completion record
+│   └── validation-report.md     # Sanitized runtime and teardown evidence
+├── lambda/                      # Exact-instance auto-stop function
+├── scripts/                     # Bootstrap template and read-only cleanup verifier
+├── tests/                       # Automated regression suite
+├── .github/workflows/           # Continuous integration
+├── *.tf                         # Main Terraform root module
+├── README.md
+└── requirements.txt
 ```
 
-The exact profiler instance was subsequently confirmed stopped.
+The root Terraform files intentionally remain together because they form one conventional Terraform root module.
 
-No AWS console screenshot is published because the retained evidence archive contains machine-readable CLI and log evidence, not an image. No screenshot has been fabricated. The sanitized tables in the [final report](docs/final-validation-report.md) are generated documentation derived from verified evidence, not AWS screenshots.
+## Local Verification
 
-## Activity-lease-aware auto-stop
-
-Before a published run begins, the reporter writes `CarbontraceActiveUntil` on the exact EC2 instance and confirms the exact value through bounded `DescribeInstances` retries. If visibility is never confirmed, cleanup is attempted and measurement, workload execution, and publication do not start.
-
-The Lambda:
-
-1. validates the configured exact instance ID and bounded environment values;
-2. describes that exact instance;
-3. skips non-running or recently launched instances;
-4. honors a lease only when `now < active_until <= now + 600`;
-5. ignores and logs malformed or excessively future-dated leases;
-6. repeats the instance and lease check immediately before requesting stop; and
-7. calls `StopInstances`, never `TerminateInstances`.
-
-The minimum runtime is 900 seconds. EC2 API clients use standard retries with three total attempts, a three-second connection timeout, and a five-second read timeout.
-
-## Security and cost controls
-
-- SSH ingress accepts one globally routable operator IPv4 `/32`; the address remains private in ignored `terraform.tfvars`.
-- There is no public `0.0.0.0/0` ingress rule.
-- The instance type is constrained to `t3.micro` and the deployment Region to `us-east-1`.
-- The Canonical AMI lookup accepts the exact supplied image ID and only Canonical owner `099720109477`; it does not use `most_recent` or a wildcard name.
-- The deployment identity cannot create or alter the runtime roles or instance profile.
-- Each runtime role is restricted to its exact operational purpose; neither has `TerminateInstances`.
-- The reporter validates metric values before creating the CloudWatch client and fails nonzero on publishing failure.
-- Application and Lambda log groups have bounded retention.
-- Direct Python dependencies are transitively hash-locked and audited in CI.
-- The hourly auto-stop is a circuit breaker, not a substitute for teardown.
-- A stopped instance can still incur EBS charges; the verified saved destroy removed the main stack.
-
-## Tests and CI
-
-The final implementation contains 51 unit tests covering workload validation, metric contracts, failure behavior, lease visibility, lease bounds, auto-stop decisions, IAM policy semantics and size, bootstrap rendering, AMI pinning, and post-destroy verification.
-
-The supported local test command is:
+The repository uses `unittest`, not pytest.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
-```
-
-The repository is configured around `unittest`, not `pytest`; no pytest result is claimed.
-
-The GitHub Actions workflow runs:
-
-- hash-locked dependency installation
-- `pip check`
-- `pip-audit`
-- all Python unit tests
-- focused IAM and bootstrap regressions
-- Terraform formatting, offline initialization, and validation for both modules
-- a tracked-diff guard after Terraform initialization
-
-The documentation release branch remains local until human review, so no new remote CI result is claimed here.
-
-## Verified teardown
-
-The deployment used reviewed, checksummed saved plans for both apply and destroy. The saved destroy application reported:
-
-```text
-Apply complete! Resources: 0 added, 0 changed, 10 destroyed.
-```
-
-It removed the dashboard, EventBridge rule and target, application and Lambda log groups, Lambda error alarm, EC2 instance, Lambda function, Lambda invoke permission, and security group. Terraform state then contained zero managed resources.
-
-The read-only verifier reported clear results for EC2 instances, EBS volumes, security groups, network interfaces, both log groups, Lambda, EventBridge, Lambda permission, alarm, and dashboard:
-
-```text
-Post-destroy verification passed: no main-stack resources remain.
-```
-
-The protected versioned S3 backend, runtime roles, instance profile, deployment identity and policies, EC2 key pair, and operator-local PEM were intentionally retained because they are prerequisites outside the main stack.
-
-## Reproduction workflow
-
-Reproduction is intentionally gated. Do not treat these commands as authorization to deploy.
-
-1. Create the protected backend and administrator-managed runtime identities.
-2. Replace `<AWS_ACCOUNT_ID>` in the public IAM/backend templates locally.
-3. Copy the example variables into ignored private files and provide the account ID, operator `/32`, key-pair name, pinned AMI, and reviewed 40-character application revision.
-4. Initialize with the private backend configuration.
-5. create a binary saved plan, inspect `terraform show`, and record its SHA-256;
-6. apply only that reviewed saved plan;
-7. collect and sanitize runtime evidence; and
-8. create, inspect, checksum, and apply only a saved destroy plan, then run the read-only orphan verifier.
-
-```bash
-cp terraform.tfvars.example terraform.tfvars
-cp backend.hcl.example backend.hcl
-terraform init -backend-config=backend.hcl -lockfile=readonly
+.venv/bin/python -m pip check
+.venv/bin/python -m pip_audit -r requirements.txt
 terraform fmt -check -recursive
 terraform validate
-terraform plan -out=main.tfplan
-terraform show main.tfplan
-shasum -a 256 main.tfplan
-terraform apply main.tfplan
-
-terraform plan -destroy -out=destroy.tfplan
-terraform show destroy.tfplan
-shasum -a 256 destroy.tfplan
-terraform apply destroy.tfplan
-
-AWS_PROFILE=carbontrace AWS_REGION=us-east-1 \
-  .venv/bin/python scripts/verify_post_destroy.py
+terraform -chdir=bootstrap validate
 ```
 
-Raw evidence, plans, state, private variables, backend configuration, keys, audit output, and deployment transcripts are ignored and must never be committed. `aws_account_id` is intentionally required in both Terraform modules; the public repository contains no deployment-account default.
+CI performs the corresponding dependency, Python, IAM, bootstrap, formatting, and Terraform checks.
 
-## Evidence and limitations
+## Deployment Workflow
 
-The raw local evidence archive is intentionally excluded from Git. Its verified SHA-256 is:
+The AWS main stack is not currently deployed. A future reproduction should be an explicitly reviewed operation, not an automatic consequence of cloning the repository.
 
-```text
-4375ea6599a60338d50aa68a25418cc36fae6c549fd73ae3519c51cced75619a
-```
+At a high level:
 
-The completed `post-destroy-verification.txt` file independently hashes to `3a34622d3ef4f8053ed5ed9c23b9adf8b9fd31df96ba173db88242059a5f465f`; that digest and the archive digest are recorded and verified in the ignored local `evidence/SHA256SUMS` manifest. The transcript's displayed `88afcb3b…` value is an intermediate digest calculated before the checksum output was appended back into the same file with `tee -a`. It does not authenticate the completed file.
+1. Create the protected backend and administrator-managed runtime identities.
+2. Copy the example configuration into ignored local files.
+3. Replace account, network, key-pair, AMI, backend, and revision placeholders locally.
+4. Validate the bootstrap and main Terraform modules.
+5. Create a binary saved deployment plan.
+6. Inspect the rendered plan and record its checksum.
+7. Apply only that reviewed saved plan.
+8. Validate runtime identity, metrics, logs, dashboard, activity leases, and auto-stop.
+9. Create, inspect, checksum, and apply only a saved destroy plan.
+10. Confirm empty Terraform state and run the read-only post-destroy verifier.
 
-Additional limitations include the single Region and instance type, CodeCarbon model uncertainty, PUE 1.0 excluding facility overhead, default-VPC/public-IPv4 deployment, host variability, and the lack of a retained dashboard screenshot.
+Start with [`terraform.tfvars.example`](terraform.tfvars.example), [`backend.hcl.example`](backend.hcl.example), and the [runtime identity guide](bootstrap/runtime-roles/README.md). Never commit private variables, backend configuration, state, saved plans, credentials, keys, or raw evidence.
 
-## Future direction
+## Current Status
 
-The deliberately inefficient loop is a controlled baseline. A future phase can replace it with a real model-inference workload while keeping the same measurement boundaries, metric schema, scientific caveats, dashboard, activity lease, and teardown controls.
+- engineering implementation complete
+- automated and AWS runtime validation complete
+- evidence collected and sanitized
+- temporary Terraform-managed main stack intentionally destroyed
+- no main-stack resources found by the post-destroy verifier
+- protected backend and administrator-managed prerequisites retained intentionally
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Product requirements and completion record](docs/product-requirements.md)
+- [Final validation and teardown report](docs/validation-report.md)
+
+## Known Limitations
+
+- energy, watts, and CO2e remain modeled estimates rather than physical measurements
+- validation covered one AWS Region, one EC2 instance type, and a short synthetic workload
+- PUE is fixed at 1.0 and excludes facility overhead
+- no AWS dashboard screenshot was retained
+- no standalone pre-destroy alarm-state snapshot exists
+- historical Git revisions may contain earlier account-specific examples
+
+The raw evidence archive remains intentionally excluded from Git. Evidence integrity, final SHA-256 values, and the historical transcript-checksum caveat are documented in the [validation report](docs/validation-report.md).
+
+## Future Direction
+
+The bounded synthetic workload provides a controlled baseline. It can be replaced with a model-inference workload while preserving the same metric contract, activity-lease protection, estimator disclosures, and teardown controls.

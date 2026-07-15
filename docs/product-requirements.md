@@ -13,7 +13,7 @@ Carbontrace is a small, infrastructure-as-code instrumentation harness that runs
 
 The final implementation was deployed and validated in AWS `us-east-1`. Four workload runs published successfully, the natural EventBridge/Lambda circuit breaker stopped the exact instance, and a reviewed saved destroy plan removed all ten Terraform-managed main-stack resources. The protected backend and administrator-managed prerequisites were retained by design.
 
-The public validation record is [docs/final-validation-report.md](docs/final-validation-report.md).
+The public validation record is the [final validation report](validation-report.md).
 
 ## 2. Product narrative
 
@@ -50,7 +50,7 @@ The public validation record is [docs/final-validation-report.md](docs/final-val
 
 ## 5. Final architecture
 
-The final architecture is documented as Mermaid in [README.md](README.md) and the [validation report](docs/final-validation-report.md). Its core flow is:
+The final architecture is documented as Mermaid in the [main README](../README.md) and the [validation report](validation-report.md). Its core flow is:
 
 ```text
 Terraform
