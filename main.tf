@@ -20,7 +20,7 @@ resource "aws_security_group" "instance" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description = "SSH from the operator's trusted IP only"
+    description = "SSH from the trusted operator IP only"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
