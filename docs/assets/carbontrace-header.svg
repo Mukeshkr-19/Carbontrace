@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260" role="img" aria-labelledby="title description">
+  <title id="title">Carbontrace</title>
+  <desc id="description">Evidence-driven AWS workload profiling with secure infrastructure, honest carbon estimates, and automatic cost controls.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071A2B"/>
+      <stop offset="0.55" stop-color="#0B3440"/>
+      <stop offset="1" stop-color="#0A6A65"/>
+    </linearGradient>
+    <linearGradient id="trace" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#59E3C2" stop-opacity="0"/>
+      <stop offset="0.22" stop-color="#59E3C2"/>
+      <stop offset="0.75" stop-color="#A9F7D6"/>
+      <stop offset="1" stop-color="#A9F7D6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="260" rx="24" fill="url(#background)"/>
+  <circle cx="1070" cy="42" r="170" fill="#52D6B4" opacity="0.07"/>
+  <circle cx="1128" cy="228" r="115" fill="#8AE8D0" opacity="0.06"/>
+  <path d="M0 203 H180 L214 169 L252 221 L292 139 L338 203 H500 L530 187 L558 203 H1200" fill="none" stroke="url(#trace)" stroke-width="3" filter="url(#glow)"/>
+
+  <g transform="translate(74 54)">
+    <path d="M44 5 C17 22 6 48 13 75 C20 102 44 121 73 122 C104 123 130 101 136 72 C142 44 128 18 103 5 C97 39 82 60 58 72 C69 50 66 27 44 5 Z" fill="#63E6C3" opacity="0.95"/>
+    <path d="M48 101 C70 76 90 54 115 31" fill="none" stroke="#E8FFF7" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="48" cy="101" r="7" fill="#E8FFF7"/>
+    <circle cx="115" cy="31" r="7" fill="#E8FFF7"/>
+  </g>
+
+  <text x="250" y="104" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">Carbontrace</text>
+  <text x="253" y="146" fill="#B7F4E2" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.8">SECURE AWS WORKLOAD PROFILING</text>
+  <text x="253" y="181" fill="#D8ECE8" font-family="Inter, Arial, sans-serif" font-size="18">Observed utilization · modeled carbon · verified teardown</text>
+
+  <g transform="translate(942 83)" fill="none" stroke="#B7F4E2" stroke-width="3" opacity="0.9">
+    <rect x="0" y="0" width="158" height="94" rx="13"/>
+    <path d="M22 27 H136 M22 48 H105 M22 69 H122" stroke-linecap="round"/>
+    <circle cx="130" cy="48" r="9" fill="#63E6C3" stroke="none"/>
+  </g>
+</svg>

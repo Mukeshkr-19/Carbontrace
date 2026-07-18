@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title description">
+  <title id="title">Carbontrace validated runtime evidence</title>
+  <desc id="description">Three bar charts compare average CPU utilization, estimated energy, and estimated carbon dioxide equivalent across four verified workload runs. All four metric publications succeeded.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071A2B"/>
+      <stop offset="1" stop-color="#0B3440"/>
+    </linearGradient>
+    <linearGradient id="cpu" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3DCFB0"/>
+      <stop offset="1" stop-color="#8AF0D1"/>
+    </linearGradient>
+    <linearGradient id="energy" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5FA8FF"/>
+      <stop offset="1" stop-color="#9BC9FF"/>
+    </linearGradient>
+    <linearGradient id="carbon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#B7DE58"/>
+      <stop offset="1" stop-color="#E0F49A"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="520" rx="24" fill="url(#background)"/>
+  <text x="56" y="62" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">Four validated workload runs</text>
+  <text x="56" y="94" fill="#B7D3D5" font-family="Inter, Arial, sans-serif" font-size="16">Generated from sanitized validation evidence · CodeCarbon values are modeled estimates</text>
+
+  <g transform="translate(56 132)">
+    <text x="0" y="0" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Average CPU utilization</text>
+    <text x="304" y="0" text-anchor="end" fill="#8FAEB2" font-family="Inter, Arial, sans-serif" font-size="13">0–110%</text>
+    <g font-family="Inter, Arial, sans-serif" font-size="14">
+      <text x="0" y="43" fill="#D6E7E7">Run 1</text><rect x="56" y="27" width="232.1" height="21" rx="5" fill="url(#cpu)"/><text x="298" y="43" fill="#FFFFFF">102.11%</text>
+      <text x="0" y="91" fill="#D6E7E7">Run 2</text><rect x="56" y="75" width="231.3" height="21" rx="5" fill="url(#cpu)"/><text x="298" y="91" fill="#FFFFFF">101.78%</text>
+      <text x="0" y="139" fill="#D6E7E7">Run 3</text><rect x="56" y="123" width="232.2" height="21" rx="5" fill="url(#cpu)"/><text x="298" y="139" fill="#FFFFFF">102.17%</text>
+      <text x="0" y="187" fill="#D6E7E7">Run 4</text><rect x="56" y="171" width="232.6" height="21" rx="5" fill="url(#cpu)"/><text x="298" y="187" fill="#FFFFFF">102.35%</text>
+    </g>
+    <text x="0" y="222" fill="#8FAEB2" font-family="Inter, Arial, sans-serif" font-size="13">Process accounting may exceed 100%; values are not clamped.</text>
+  </g>
+
+  <g transform="translate(444 132)">
+    <text x="0" y="0" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Estimated energy</text>
+    <text x="304" y="0" text-anchor="end" fill="#8FAEB2" font-family="Inter, Arial, sans-serif" font-size="13">0–1.10 Wh</text>
+    <g font-family="Inter, Arial, sans-serif" font-size="14">
+      <text x="0" y="43" fill="#D6E7E7">Run 1</text><rect x="56" y="27" width="113.0" height="21" rx="5" fill="url(#energy)"/><text x="179" y="43" fill="#FFFFFF">0.4970 Wh</text>
+      <text x="0" y="91" fill="#D6E7E7">Run 2</text><rect x="56" y="75" width="108.4" height="21" rx="5" fill="url(#energy)"/><text x="174" y="91" fill="#FFFFFF">0.4769 Wh</text>
+      <text x="0" y="139" fill="#D6E7E7">Run 3</text><rect x="56" y="123" width="229.0" height="21" rx="5" fill="url(#energy)"/><text x="295" y="139" fill="#FFFFFF">1.0075 Wh</text>
+      <text x="0" y="187" fill="#D6E7E7">Run 4</text><rect x="56" y="171" width="148.0" height="21" rx="5" fill="url(#energy)"/><text x="214" y="187" fill="#FFFFFF">0.6511 Wh</text>
+    </g>
+    <text x="0" y="222" fill="#8FAEB2" font-family="Inter, Arial, sans-serif" font-size="13">CodeCarbon 3.2.8 offline estimate · Virginia model · PUE 1.0</text>
+  </g>
+
+  <g transform="translate(832 132)">
+    <text x="0" y="0" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Estimated CO2e</text>
+    <text x="304" y="0" text-anchor="end" fill="#8FAEB2" font-family="Inter, Arial, sans-serif" font-size="13">0–0.40 g</text>
+    <g font-family="Inter, Arial, sans-serif" font-size="14">
+      <text x="0" y="43" fill="#D6E7E7">Run 1</text><rect x="56" y="27" width="114.7" height="21" rx="5" fill="url(#carbon)"/><text x="181" y="43" fill="#FFFFFF">0.1835 g</text>
+      <text x="0" y="91" fill="#D6E7E7">Run 2</text><rect x="56" y="75" width="110.0" height="21" rx="5" fill="url(#carbon)"/><text x="176" y="91" fill="#FFFFFF">0.1761 g</text>
+      <text x="0" y="139" fill="#D6E7E7">Run 3</text><rect x="56" y="123" width="232.4" height="21" rx="5" fill="url(#carbon)"/><text x="298" y="139" fill="#FFFFFF">0.3719 g</text>
+      <text x="0" y="187" fill="#D6E7E7">Run 4</text><rect x="56" y="171" width="150.2" height="21" rx="5" fill="url(#carbon)"/><text x="216" y="187" fill="#FFFFFF">0.2403 g</text>
+    </g>
+    <text x="0" y="222" fill="#8FAEB2" font-family="Inter, Arial, sans-serif" font-size="13">Modeled CO2e, not a physical EC2 or wall-power measurement.</text>
+  </g>
+
+  <line x1="56" y1="402" x2="1144" y2="402" stroke="#315661" stroke-width="1"/>
+  <g font-family="Inter, Arial, sans-serif">
+    <text x="56" y="447" fill="#63E6C3" font-size="22" font-weight="700">4/4 publish successes</text>
+    <text x="334" y="447" fill="#D6E7E7" font-size="16">zero publication failures</text>
+    <text x="686" y="447" fill="#D6E7E7" font-size="16">five stable CloudWatch metric contracts</text>
+    <text x="56" y="482" fill="#8FAEB2" font-size="13">Generated evidence visualization — not an AWS console screenshot. Exact sanitized values are recorded in docs/validation-report.md.</text>
+  </g>
+</svg>

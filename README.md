@@ -1,56 +1,105 @@
-# Carbontrace
+<p align="center">
+  <img src="docs/assets/carbontrace-header.svg" alt="Carbontrace — evidence-driven AWS workload profiling" width="100%">
+</p>
 
-[![Carbontrace CI](https://github.com/Mukeshkr-19/Carbontrace/actions/workflows/ci.yml/badge.svg)](https://github.com/Mukeshkr-19/Carbontrace/actions/workflows/ci.yml)
+<p align="center">
+  <strong>Secure AWS workload profiling with scientifically honest carbon estimates and a built-in cost-safety lifecycle.</strong>
+</p>
 
-Carbontrace is a secure, Terraform-managed AWS workload profiler that observes process CPU and memory usage, derives modeled energy and carbon estimates with CodeCarbon, publishes telemetry to CloudWatch, and automatically stops its EC2 profiler when no validated workload lease is active.
+<p align="center">
+  <a href="https://github.com/Mukeshkr-19/Carbontrace/actions/workflows/ci.yml"><img src="https://github.com/Mukeshkr-19/Carbontrace/actions/workflows/ci.yml/badge.svg" alt="Carbontrace CI"></a>
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/Terraform-1.15.8-844FBA?logo=terraform&logoColor=white" alt="Terraform 1.15.8">
+  <img src="https://img.shields.io/badge/CodeCarbon-3.2.8-2E8B57" alt="CodeCarbon 3.2.8">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7E8C" alt="MIT License"></a>
+</p>
 
-**Status:** Implementation and AWS runtime validation completed successfully. The temporary Terraform-managed main stack was intentionally destroyed after evidence collection; the protected state backend and administrator-managed prerequisites were retained by design.
+<p align="center">
+  <a href="#architecture">Architecture</a> ·
+  <a href="#what-it-measures-and-estimates">Metric contract</a> ·
+  <a href="#validation-results">Validation</a> ·
+  <a href="docs/validation-report.md">Evidence report</a> ·
+  <a href="#deployment-workflow">Reproduce</a>
+</p>
+
+Carbontrace is a Terraform-managed AWS profiler that observes process CPU and memory usage, derives modeled energy and carbon estimates with CodeCarbon, publishes telemetry to CloudWatch, and safely stops its EC2 profiler when no validated workload lease is active.
+
+> **Validated lifecycle:** the implementation was deployed from an immutable revision, exercised through four real workload runs, stopped naturally by EventBridge and Lambda, destroyed through a reviewed saved Terraform plan, and checked for remaining main-stack resources.
+
+## Verified at a Glance
+
+| `51` automated tests | `4/4` successful runs | `5` CloudWatch metrics | `0` publish failures | `0` main-stack resources remaining |
+|:---:|:---:|:---:|:---:|:---:|
+
+The temporary Terraform-managed stack is intentionally **not running**. The protected state backend and administrator-managed prerequisites were retained by design.
+
+## Runtime Evidence
+
+<p align="center">
+  <img src="docs/assets/runtime-evidence.svg" alt="Four validated Carbontrace runs comparing observed CPU utilization with modeled energy and CO2e estimates" width="100%">
+</p>
+
+This is a generated visualization of the sanitized evidence—not an AWS console screenshot. The exact values, timestamps, methodology, and evidence limitations are documented in the [final validation report](docs/validation-report.md#four-successful-workload-runs).
 
 ## Why Carbontrace
 
-Cloud workloads expose CPU and memory telemetry, but they do not normally expose direct hardware power readings. Carbontrace explores how to build an honest, reproducible bridge between workload behavior and estimated energy or carbon impact without presenting modeled values as physical measurements.
+Cloud platforms expose rich utilization telemetry, but not direct hardware power readings for an individual EC2 workload. Carbontrace builds a reproducible bridge between process behavior and modeled energy or carbon impact while keeping observations, estimates, and operational claims clearly separated.
 
-The project brings together:
-
-- Terraform infrastructure and remote-state design
-- AWS IAM least privilege and deployment/runtime identity separation
-- EC2 bootstrap, immutable source revisions, and hardened `systemd` execution
-- Python process instrumentation with psutil
-- CodeCarbon energy and CO2e estimation
-- CloudWatch custom metrics, logs, dashboards, and alarms
-- EventBridge and Lambda operational safety automation
-- evidence-driven deployment validation and teardown verification
+| Secure by default | Honest by design | Finite by construction |
+|---|---|---|
+| Least-privilege IAM, IMDSv2, encrypted storage, an unprivileged runtime user, and pinned source and AMI inputs. | CPU and memory are process observations; energy, watts, and CO2e are explicitly labeled CodeCarbon estimates. | A confirmed activity lease protects active work while EventBridge and Lambda stop idle compute and Terraform verifies teardown. |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    TF["Terraform"] --> EC2["EC2 profiler<br/>t3.micro"]
-    TF --> CW["CloudWatch"]
-    TF --> EB["EventBridge<br/>hourly schedule"]
-    TF --> LAMBDA["Auto-stop Lambda"]
-    TF -. "state and lock" .-> BACKEND["Protected S3 backend<br/>retained separately"]
-
-    subgraph PROFILER["Profiler instance"]
-        EC2 --> TIMER["systemd timer"]
-        TIMER --> REPORTER["Carbontrace reporter<br/>unprivileged user"]
-        REPORTER --> PSUTIL["psutil<br/>CPU and memory observations"]
-        REPORTER --> CODECARBON["CodeCarbon<br/>modeled energy and CO2e"]
-        REPORTER --> LEASE["CarbontraceActiveUntil<br/>confirmed activity lease"]
-        REPORTER --> AGENT["CloudWatch Agent<br/>cwagent user"]
+    subgraph PROVISIONING["Provisioning and state"]
+        direction TB
+        TF["Terraform"]
+        BACKEND["Protected S3 backend<br/>retained separately"]
+        TF -. "state and lock" .-> BACKEND
     end
 
-    PSUTIL --> METRICS["Five custom metrics"]
-    CODECARBON --> METRICS
-    METRICS --> CW
-    AGENT --> LOGS["Application logs"]
-    LOGS --> CW
-    CW --> DASHBOARD["Five-widget dashboard"]
-    CW --> ALARM["Lambda error alarm"]
+    subgraph PROFILER["EC2 profiler runtime"]
+        direction TB
+        EC2["EC2 t3.micro<br/>encrypted EBS · IMDSv2"]
+        TIMER["hardened systemd timer"]
+        REPORTER["Carbontrace reporter<br/>carbontrace user"]
+        PSUTIL["psutil<br/>CPU + memory observations"]
+        CODECARBON["CodeCarbon<br/>modeled energy + CO2e"]
+        LEASE["confirmed activity lease"]
+        AGENT["CloudWatch Agent<br/>cwagent user"]
+        EC2 --> TIMER --> REPORTER
+        REPORTER --> PSUTIL
+        REPORTER --> CODECARBON
+        REPORTER --> LEASE
+        REPORTER --> AGENT
+    end
 
-    EB --> LAMBDA
-    LAMBDA --> CHECKS["Exact instance<br/>state + age + lease checks"]
-    CHECKS -->|"StopInstances when safe"| EC2
+    subgraph TELEMETRY["CloudWatch telemetry"]
+        direction TB
+        METRICS["five custom metrics"]
+        LOGS["structured logs"]
+        DASHBOARD["five-widget dashboard"]
+        ALARM["Lambda error alarm"]
+        METRICS --> DASHBOARD
+    end
+
+    subgraph SAFETY["Idle-compute safety"]
+        direction TB
+        EB["EventBridge<br/>rate(1 hour)"]
+        LAMBDA["auto-stop Lambda"]
+        CHECKS["exact instance<br/>state + age + lease checked twice"]
+        STOP["StopInstances<br/>exact profiler only"]
+        EB --> LAMBDA --> CHECKS --> STOP
+    end
+
+    TF --> EC2
+    TF --> TELEMETRY
+    TF --> SAFETY
+    PSUTIL --> METRICS
+    CODECARBON --> METRICS
+    AGENT --> LOGS
     LEASE -. "valid lease prevents stop" .-> CHECKS
 ```
 
@@ -217,6 +266,10 @@ Start with [`terraform.tfvars.example`](terraform.tfvars.example), [`backend.hcl
 - [Product requirements and completion record](docs/product-requirements.md)
 - [Final validation and teardown report](docs/validation-report.md)
 
+## License
+
+Carbontrace is available under the [MIT License](LICENSE). You may use, modify, and distribute the software provided that the copyright and license notice are preserved. The software is provided without warranty.
+
 ## Known Limitations
 
 - energy, watts, and CO2e remain modeled estimates rather than physical measurements
@@ -230,4 +283,4 @@ The raw evidence archive remains intentionally excluded from Git. Evidence integ
 
 ## Future Direction
 
-The bounded synthetic workload provides a controlled baseline. It can be replaced with a model-inference workload while preserving the same metric contract, activity-lease protection, estimator disclosures, and teardown controls.
+The bounded synthetic workload provides a controlled baseline. The next phase extends Carbontrace to controlled machine-learning training and large language model inference workloads, with per-epoch and per-request carbon attribution for comparing AI-generated and human-authored code under the same pinned environment and estimation methodology. The existing metric contract, activity-lease protection, estimator disclosures, and teardown controls remain unchanged.
