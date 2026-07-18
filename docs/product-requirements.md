@@ -1,8 +1,8 @@
 # PRD: Carbontrace
 
 **Author:** Sanjay
-**Status:** Implementation validated; main AWS stack intentionally destroyed
-**Last updated:** 2026-07-15
+**Status:** Complete — implementation validated, documentation released, and main AWS stack intentionally destroyed
+**Last updated:** 2026-07-18
 **Validated revision:** `1cb74aa057ea36b9715f50ada168a9d2e3a91aa9`
 
 ---
@@ -36,7 +36,9 @@ The public validation record is the [final validation report](validation-report.
 - [x] Use reviewed saved plans for deployment and teardown.
 - [x] Verify that no main-stack resource remained after destroy.
 - [x] Document methodology and limitations honestly.
-- [ ] Publish an actual sanitized dashboard screenshot. No image was retained in the evidence archive, so none is claimed or fabricated.
+- [x] Publish a sanitized runtime-evidence visualization derived from the four verified runs and label it clearly as generated evidence rather than an AWS console screenshot.
+
+All core requirements are complete. An actual AWS dashboard screenshot was not retained during the deployment and is therefore documented as an evidence limitation and optional future enhancement—not an incomplete implementation requirement.
 
 ## 4. Non-goals
 
@@ -75,7 +77,7 @@ Protected S3 backend -> retained after main-stack destroy
 
 | Area | Final choice | Rationale |
 |---|---|---|
-| Network | Default VPC plus one custom security group | Keeps the PoC bounded; SSH is restricted to one private operator `/32` |
+| Network | Default VPC plus one custom security group | Keeps the PoC bounded; SSH is restricted to one operator-supplied public IPv4 `/32` whose value remains outside Git |
 | Compute | One `t3.micro` | Cost-bounded and enforced by validation and IAM |
 | Image | Required exact Ubuntu AMI ID, validated against Canonical owner `099720109477` | Prevents silent `most_recent` drift |
 | Root storage | Encrypted 8 GiB `gp3`, delete on termination | Bounded storage with encryption and deterministic cleanup |
@@ -135,7 +137,7 @@ Protected S3 backend -> retained after main-stack destroy
 - [x] Every widget configured with `Average` and a 300-second period
 - [x] Four publish successes and zero publication failures in application logs
 - [x] Terraform-provisioned dashboard and log groups
-- [ ] Actual dashboard screenshot retained for publication
+- [x] Sanitized runtime-evidence visualization published from the verified run values without claiming it is an AWS console screenshot
 
 ### Phase 4 — Auto-stop and cost hygiene
 
@@ -157,12 +159,13 @@ Protected S3 backend -> retained after main-stack destroy
 
 - [x] README updated to final validated/destroyed status
 - [x] Mermaid architecture documented
+- [x] Sanitized runtime-evidence visualization added to the README
 - [x] Measurements and modeled estimates distinguished explicitly
 - [x] Final validation and teardown report added
 - [x] Raw evidence, plans, state, private variables, keys, and audit output ignored
-- [x] Public templates use `<AWS_ACCOUNT_ID>` rather than Sanjay's account identifier
-- [ ] Human review, commit, push, and remote CI for the documentation release
-- [ ] Optional real dashboard screenshot if a safely sanitized image becomes available
+- [x] Public templates use `<AWS_ACCOUNT_ID>` rather than an account-specific identifier
+- [x] MIT license and project presentation assets published
+- [x] Human review, commit, push, and remote CI completed for the documentation release
 
 ## 8. Validation outcome
 
@@ -218,11 +221,12 @@ Verified archive SHA-256:
 
 The completed post-destroy transcript independently hashes to `3a34622d3ef4f8053ed5ed9c23b9adf8b9fd31df96ba173db88242059a5f465f` and is recorded with the archive digest in the verified ignored `evidence/SHA256SUMS` manifest. Its displayed `88afcb3b…` value was calculated before checksum lines were appended back into that same file with `tee -a`; it is an intermediate pre-append digest, not authentication of the completed transcript.
 
-No dashboard screenshot or standalone alarm-state snapshot exists in the archive. The Terraform configuration and post-destroy verifier cover the alarm lifecycle, but the report does not claim an unavailable runtime alarm screenshot.
+No dashboard screenshot or standalone alarm-state snapshot exists in the archive. The Terraform configuration and post-destroy verifier cover the alarm lifecycle, but the report does not claim unavailable runtime screenshots. The published runtime graphic is generated only from sanitized verified values and is labeled accordingly.
 
 ## 11. Future work
 
-- replace the synthetic workload with a controlled LLM inference workload
+- replace the synthetic workload with controlled machine-learning training and LLM inference workloads
+- add per-epoch and per-request attribution under the same pinned estimator methodology
 - compare workload revisions under the same metric and estimator contract
 - evaluate additional reviewed Region-to-carbon-model mappings
 - remove SSH in favor of Session Manager if the required security architecture is added
@@ -230,4 +234,4 @@ No dashboard screenshot or standalone alarm-state snapshot exists in the archive
 - preserve the final evidence manifest and raw transcript without normalization or regeneration
 - consider external experimental calibration if more rigorous energy claims are needed
 
-The optional future work does not change the completed status of the validated implementation and teardown.
+These optional extensions do not change the completed status of the validated implementation, documentation release, or teardown.

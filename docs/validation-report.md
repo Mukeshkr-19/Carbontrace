@@ -1,9 +1,10 @@
 # Carbontrace final validation and teardown report
 
 **Report date:** 2026-07-15<br>
+**Documentation status updated:** 2026-07-18<br>
 **Validated implementation revision:** `1cb74aa057ea36b9715f50ada168a9d2e3a91aa9`<br>
 **Deployment Region:** AWS `us-east-1`<br>
-**Publication status:** Sanitized documentation; raw evidence remains local and untracked
+**Publication status:** Sanitized documentation published; raw evidence remains local and untracked
 
 ## Executive summary
 
@@ -102,7 +103,7 @@ flowchart TB
 - EC2 `DescribeInstances` was Region-limited and read-only
 - Lambda could describe and stop only according to the reviewed exact-instance/tag design
 - neither runtime policy granted `TerminateInstances`
-- SSH ingress was restricted to one private operator `/32`; the address is not published
+- SSH ingress was restricted to one operator-supplied public IPv4 `/32`; the address is not published
 - public templates use `<AWS_ACCOUNT_ID>`, `<INSTANCE_ID>`, and similar placeholders
 
 ## Carbon methodology and scientific boundaries
@@ -185,7 +186,7 @@ The stable dimensions were `Project`, `InstanceType`, and `WorkloadVersion`. Met
 | EventBridge targets | exactly 1 Lambda target |
 | Lambda error alarm | present in Terraform and removed by destroy; no standalone pre-destroy alarm-state snapshot in archive |
 
-The archive does not include a dashboard screenshot. The tables above are generated evidence visualizations, not AWS console screenshots.
+The archive does not include a dashboard screenshot. The README therefore uses a [generated runtime-evidence visualization](../README.md#runtime-evidence) based only on the sanitized values above; it is explicitly labeled as generated evidence rather than an AWS console screenshot.
 
 ## Natural auto-stop proof
 
@@ -290,7 +291,7 @@ The implementation revision contains 51 automated tests covering:
 - IAM semantics and compact policy size
 - read-only cleanup verification
 
-The repository CI definition additionally checks hash-locked dependencies with `pip check` and `pip-audit`, Terraform formatting and validation for both modules, and a clean tracked diff after initialization. This documentation branch is intentionally not pushed, so no remote CI result is asserted.
+The repository CI definition additionally checks hash-locked dependencies with `pip check` and `pip-audit`, Terraform formatting and validation for both modules, and a clean tracked diff after initialization. The documentation release was committed and pushed to `main`, and its push-triggered Carbontrace CI run completed successfully.
 
 Local release-preparation results:
 
@@ -307,9 +308,9 @@ Local release-preparation results:
 | `pip check` | no broken requirements |
 | `pip-audit 2.10.1 -r requirements.txt` | no known vulnerabilities reported |
 | `git diff --check` | passed |
-| publication pattern scan | no access keys, private-key blocks, AWS credential assignments, Sanjay-specific account ID, unrelated local artifacts, or tracked private files found |
+| publication pattern scan | no access keys, private-key blocks, AWS credential assignments, account-specific identifiers, unrelated local artifacts, or tracked private files found |
 
-The project does not declare `pytest`; its supported command is `.venv/bin/python -m unittest discover -s tests -v`, the 51-test discovery command used by CI. The starting CI workflow has no dedicated secret-scanning action, so release preparation used explicit current-tree credential, private-key, identifier, metadata, and forbidden-artifact scans. Remote CI must still run after a human-approved push.
+The project does not declare `pytest`; its supported command is `.venv/bin/python -m unittest discover -s tests -v`, the 51-test discovery command used by CI. The CI workflow has no dedicated secret-scanning action, so release preparation supplements it with explicit current-tree credential, private-key, identifier, metadata, and forbidden-artifact scans. Remote CI is required for every published documentation change.
 
 ## Reproduction notes
 
@@ -327,7 +328,7 @@ The critical sequence is:
 8. create, inspect, checksum, and apply only a saved destroy plan;
 9. confirm zero state resources and run the read-only orphan verifier.
 
-## Known limitations and open gaps
+## Known limitations
 
 - CodeCarbon results are modeled estimates and inherit model, hardware, sampling, and electricity-data uncertainty.
 - PUE 1.0 excludes data-center facility overhead.

@@ -203,6 +203,7 @@ Carbontrace/
 ├── app/                         # Workload and metrics reporter
 ├── bootstrap/                   # Backend module and administrator-reviewed IAM templates
 ├── docs/
+│   ├── assets/                  # Header and generated evidence visualization
 │   ├── README.md                # Documentation index
 │   ├── product-requirements.md  # Requirements, decisions, and completion record
 │   └── validation-report.md     # Sanitized runtime and teardown evidence
@@ -211,6 +212,7 @@ Carbontrace/
 ├── tests/                       # Automated regression suite
 ├── .github/workflows/           # Continuous integration
 ├── *.tf                         # Main Terraform root module
+├── LICENSE                      # MIT license
 ├── README.md
 └── requirements.txt
 ```
@@ -256,6 +258,8 @@ Start with [`terraform.tfvars.example`](terraform.tfvars.example), [`backend.hcl
 - engineering implementation complete
 - automated and AWS runtime validation complete
 - evidence collected and sanitized
+- documentation release, generated evidence visualization, and MIT license published
+- push-triggered Carbontrace CI completed successfully
 - temporary Terraform-managed main stack intentionally destroyed
 - no main-stack resources found by the post-destroy verifier
 - protected backend and administrator-managed prerequisites retained intentionally
